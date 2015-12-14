@@ -8,7 +8,7 @@ from enum import IntEnum
 
 import sancus.crypto
 
-import tools
+from . import tools
 
 
 class Error(Exception):

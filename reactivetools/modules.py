@@ -7,8 +7,8 @@ from elftools.elf import elffile
 
 import sancus.crypto
 
-from nodes import SancusNode
-import tools
+from .nodes import SancusNode
+from . import tools
 
 
 class Error(Exception):

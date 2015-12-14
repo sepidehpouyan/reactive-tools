@@ -7,9 +7,9 @@ import asyncio
 
 import sancus.config
 
-from nodes import SancusNode
-from modules import SancusModule
-from connection import Connection
+from .nodes import SancusNode
+from .modules import SancusModule
+from .connection import Connection
 
 
 class Error(Exception):
