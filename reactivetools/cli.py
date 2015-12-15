@@ -1,5 +1,6 @@
 import argparse
 import logging
+import asyncio
 
 from . import config
 
@@ -32,4 +33,9 @@ def _handle_deploy(args):
 def main(raw_args=None):
     args = _parse_args(raw_args)
     args.command_handler(args)
+
+    # If we don't close the event loop explicitly, there is an unhandled
+    # exception being thrown from its destructor. Not sure why but closing it
+    # here prevents annoying noise.
+    asyncio.get_event_loop().close()
 
