@@ -4,6 +4,9 @@ import ipaddress
 from pathlib import Path
 import os
 import asyncio
+import functools
+import binascii
+import types
 
 import sancus.config
 
@@ -108,9 +111,11 @@ def _load_connection(conn_dict, config):
     return Connection(from_module, from_output, to_module, to_input, key)
 
 
-def _parse_vendor_id(id_str):
-    assert 1 <= len(id_str) <= 4
-    return int(id_str, base=16)
+def _parse_vendor_id(id):
+    if not 1 <= id <= 2**16 - 1:
+        raise Error('Vendor ID out of range')
+
+    return id
 
 
 def _parse_vendor_key(key_str):
@@ -135,4 +140,86 @@ _node_load_funcs = {
 _module_load_funcs = {
     'sancus': _load_sancus_module
 }
+
+
+def dump(config, file_name):
+    with open(file_name, 'w') as f:
+        json.dump(_dump(config), f, indent=4)
+
+
+@functools.singledispatch
+def _dump(obj):
+    assert False, 'No dumper for {}'.format(type(obj))
+
+
+@_dump.register(Config)
+def _(config):
+    return {
+        'nodes': _dump(config.nodes),
+        'modules': _dump(config.modules),
+        'connections': _dump(config.connections)
+    }
+
+
+@_dump.register(list)
+def _(l):
+    return [_dump(e) for e in l]
+
+
+@_dump.register(SancusNode)
+def _(node):
+    return {
+        "type": "sancus",
+        "name": node.name,
+        "ip_address": str(node.ip_address),
+        "vendor_id": node.vendor_id,
+        "vendor_key": _dump(node.vendor_key)
+    }
+
+
+@_dump.register(SancusModule)
+def _(module):
+    return {
+        "type": "sancus",
+        "name": module.name,
+        "files": _dump(module.files),
+        "node": module.node.name,
+        "binary": _dump(module.binary),
+        "symtab": _dump(module.symtab),
+        "id": _dump(module.id),
+        "key": _dump(module.key)
+    }
+
+
+@_dump.register(Connection)
+def _(conn):
+    return {
+        "from_module": conn.from_module.name,
+        "from_output": conn.from_output,
+        "to_module": conn.to_module.name,
+        "to_input": conn.to_input,
+        "key": _dump(conn.key)
+    }
+
+
+@_dump.register(bytes)
+@_dump.register(bytearray)
+def _(bs):
+    return binascii.hexlify(bs).decode('ascii')
+
+
+@_dump.register(str)
+@_dump.register(int)
+def _(x):
+    return x
+
+
+@_dump.register(Path)
+def _(path):
+    return str(path)
+
+
+@_dump.register(types.CoroutineType)
+def _(coro):
+    return _dump(asyncio.get_event_loop().run_until_complete(coro))
 
