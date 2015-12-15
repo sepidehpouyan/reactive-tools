@@ -42,7 +42,7 @@ class Config:
 
     async def install_async(self):
         futures = map(Connection.establish, self.connections)
-        await asyncio.wait(futures)
+        await asyncio.gather(*futures)
 
     def install(self):
         asyncio.get_event_loop().run_until_complete(self.install_async())
