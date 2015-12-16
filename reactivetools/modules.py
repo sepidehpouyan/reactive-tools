@@ -56,6 +56,12 @@ class Module:
     async def get_io_id(self, io_name):
         return await self._get_io_id(io_name)
 
+    async def get_entry_id(self, entry_name):
+        return await self._get_entry_id(entry_name)
+
+    async def call(self, entry):
+        return await self.node.call(self, entry)
+
     def __check_init_args(self, node, binary, id, symtab, key):
         if not isinstance(node, self.get_supported_node_type()):
             clsname = lambda o: type(o).__name__
@@ -118,16 +124,24 @@ class SancusModule(Module):
         return linked_binary
 
     async def _get_io_id(self, io_name):
-        with open(await self.binary, 'rb') as f:
-            elf = elffile.ELFFile(f)
-            sym_name = '__sm_{}_io_{}_idx'.format(self.name, io_name)
-            symbol = self.__get_symbol(elf, sym_name)
+        sym_name = '__sm_{}_io_{}_idx'.format(self.name, io_name)
+        symbol = await self.__get_symbol(sym_name)
 
-            if symbol is None:
-                raise Error('Module {} has no endpoint named {}'
-                                .format(self.name, io_name))
+        if symbol is None:
+            raise Error('Module {} has no endpoint named {}'
+                            .format(self.name, io_name))
 
-            return symbol
+        return symbol
+
+    async def _get_entry_id(self, entry_name):
+        sym_name = '__sm_{}_entry_{}_idx'.format(self.name, entry_name)
+        symbol = await self.__get_symbol(sym_name)
+
+        if symbol is None:
+            raise Error('Module {} has no entry named {}'
+                            .format(self.name, entry_name))
+
+        return symbol
 
     @staticmethod
     def get_supported_node_type():
@@ -145,15 +159,16 @@ class SancusModule(Module):
         return _BuildConfig(cc='sancus-cc', cflags=flags,
                             ld='sancus-ld', ldflags=flags)
 
-    @staticmethod
-    def __get_symbol(elf, name):
-        name = name.encode('ascii')
-        for section in elf.iter_sections():
-            if isinstance(section, elffile.SymbolTableSection):
-                for symbol in section.iter_symbols():
-                    sym_section = symbol['st_shndx']
-                    if symbol.name == name and sym_section != 'SHN_UNDEF':
-                        return symbol['st_value']
+    async def __get_symbol(self, name):
+        with open(await self.binary, 'rb') as f:
+            elf = elffile.ELFFile(f)
+            name = name.encode('ascii')
+            for section in elf.iter_sections():
+                if isinstance(section, elffile.SymbolTableSection):
+                    for symbol in section.iter_symbols():
+                        sym_section = symbol['st_shndx']
+                        if symbol.name == name and sym_section != 'SHN_UNDEF':
+                            return symbol['st_value']
 
 
 _BuildConfig = namedtuple('_BuildConfig', ['cc', 'cflags', 'ld', 'ldflags'])

@@ -51,6 +51,24 @@ def _parse_args(args):
         '--result',
         help='File to write the resulting configuration to')
 
+    call_parser = subparsers.add_parser(
+        'call',
+        help='Call a deployed module')
+    call_parser.set_defaults(command_handler=_handle_call)
+    call_parser.add_argument(
+        '--config',
+        help='Specify configuration file to use '
+             '(the result of a previous "deploy" run)',
+        required=True)
+    call_parser.add_argument(
+        '--module',
+        help='Name of the module to call',
+        required=True)
+    call_parser.add_argument(
+        '--entry',
+        help='Name of the module\'s entry point to call',
+        required=True)
+
     return parser.parse_args(args)
 
 
@@ -63,6 +81,15 @@ def _handle_deploy(args):
     if args.result is not None:
         logging.info('Writing post-deployment configuration to %s', args.result)
         config.dump(conf, args.result)
+
+
+def _handle_call(args):
+    logging.info('Calling %s:%s', args.module, args.entry)
+
+    conf = config.load(args.config)
+    module = conf.get_module(args.module)
+
+    asyncio.get_event_loop().run_until_complete(module.call(args.entry))
 
 
 def main(raw_args=None):
