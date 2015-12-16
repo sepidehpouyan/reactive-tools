@@ -92,7 +92,11 @@ def _load_sancus_module(mod_dict, config):
     files = _load_list(mod_dict['files'],
                        lambda f: _load_module_file(f, config))
     node = config.get_node(mod_dict['node'])
-    return SancusModule(name, files, node)
+    binary = mod_dict.get('binary')
+    id = mod_dict.get('id')
+    symtab = mod_dict.get('symtab')
+    key = mod_dict.get('key')
+    return SancusModule(name, files, node, binary, id, symtab, key)
 
 
 def _load_connection(conn_dict, config):

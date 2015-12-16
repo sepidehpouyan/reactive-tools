@@ -16,18 +16,18 @@ class Error(Exception):
 
 
 class Module:
-    def __init__(self, name, files, node):
-        if not isinstance(node, self.get_supported_node_type()):
-            clsname = lambda o: type(o).__name__
-            raise Error('A {} cannot run on a {}'
-                    .format(clsname(self), clsname(node)))
+    def __init__(self, name, files, node,
+                 binary=None, id=None, symtab=None, key=None):
+
+        self.__check_init_args(node, binary, id, symtab, key)
 
         self.name = name
         self.files = files
         self.node = node
-        self.__build_fut = None
-        self.__deploy_fut = None
-        self.__key_fut = None
+
+        self.__build_fut = self.__init_future(binary)
+        self.__deploy_fut = self.__init_future(id, symtab)
+        self.__key_fut = self.__init_future(key)
 
     @property
     async def binary(self):
@@ -55,6 +55,30 @@ class Module:
 
     async def get_io_id(self, io_name):
         return await self._get_io_id(io_name)
+
+    def __check_init_args(self, node, binary, id, symtab, key):
+        if not isinstance(node, self.get_supported_node_type()):
+            clsname = lambda o: type(o).__name__
+            raise Error('A {} cannot run on a {}'
+                    .format(clsname(self), clsname(node)))
+
+        # For now, either all optionals should be given or none. This might be
+        # relaxed later if necessary.
+        optionals = (binary, id, symtab, key)
+
+        if None in optionals and any(map(lambda x: x is not None, optionals)):
+            raise Error('Either all of the optional node parameters '
+                        'should be given or none')
+
+    @staticmethod
+    def __init_future(*results):
+        if all(map(lambda x: x is None, results)):
+            return None
+
+        fut = asyncio.Future()
+        result = results[0] if len(results) == 1 else results
+        fut.set_result(result)
+        return fut
 
     async def __build(self):
         logging.info('Building module %s from %s',
