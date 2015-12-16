@@ -47,6 +47,9 @@ def _parse_args(args):
     deploy_parser.add_argument(
         'config',
         help='Configuration file describing the network')
+    deploy_parser.add_argument(
+        '--result',
+        help='File to write the resulting configuration to')
 
     return parser.parse_args(args)
 
@@ -56,6 +59,10 @@ def _handle_deploy(args):
 
     conf = config.load(args.config)
     conf.install()
+
+    if args.result is not None:
+        logging.info('Writing post-deployment configuration to %s', args.result)
+        config.dump(conf, args.result)
 
 
 def main(raw_args=None):
