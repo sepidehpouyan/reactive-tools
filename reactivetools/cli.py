@@ -15,7 +15,22 @@ def _setup_logging(args):
     else:
         level = logging.WARNING
 
-    logging.basicConfig(format='%(message)s', level=level)
+    err_handler = logging.StreamHandler(sys.stderr)
+    err_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+    err_handler.setLevel(logging.WARNING)
+    logging.root.addHandler(err_handler)
+
+    class InfoFilter(logging.Filter):
+        def filter(self, record):
+            return record.levelno < logging.WARNING
+
+    info_handler = logging.StreamHandler(sys.stdout)
+    info_handler.setFormatter(logging.Formatter('%(message)s'))
+    info_handler.setLevel(logging.INFO)
+    info_handler.addFilter(InfoFilter())
+    logging.root.addHandler(info_handler)
+
+    logging.root.setLevel(level)
 
 
 def _setup_pdb(args):
