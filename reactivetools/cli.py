@@ -98,10 +98,17 @@ def main(raw_args=None):
     _setup_logging(args)
     _setup_pdb(args)
 
-    args.command_handler(args)
+    try:
+        args.command_handler(args)
+    except BaseException as e:
+        if args.debug:
+            raise
 
-    # If we don't close the event loop explicitly, there is an unhandled
-    # exception being thrown from its destructor. Not sure why but closing it
-    # here prevents annoying noise.
-    asyncio.get_event_loop().close()
+        logging.error(e)
+        return 1
+    finally:
+        # If we don't close the event loop explicitly, there is an unhandled
+        # exception being thrown from its destructor. Not sure why but closing
+        # it here prevents annoying noise.
+        asyncio.get_event_loop().close()
 
