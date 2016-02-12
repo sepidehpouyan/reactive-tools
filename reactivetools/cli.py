@@ -3,6 +3,7 @@ import logging
 import asyncio
 import pdb
 import sys
+import binascii
 
 from . import config
 
@@ -83,6 +84,11 @@ def _parse_args(args):
         '--entry',
         help='Name of the module\'s entry point to call',
         required=True)
+    call_parser.add_argument(
+        '--arg',
+        help='Argument to pass to the entry point (hex byte array)',
+        type=binascii.unhexlify,
+        default=None)
 
     return parser.parse_args(args)
 
@@ -104,7 +110,8 @@ def _handle_call(args):
     conf = config.load(args.config)
     module = conf.get_module(args.module)
 
-    asyncio.get_event_loop().run_until_complete(module.call(args.entry))
+    asyncio.get_event_loop().run_until_complete(
+                                            module.call(args.entry, args.arg))
 
 
 def main(raw_args=None):

@@ -113,10 +113,13 @@ class Node:
         if set_key_code != _ReactiveSetKeyResultCode.Ok:
             raise Error('Got error code from module: {}'.format(set_key_code))
 
-    async def call(self, module, entry):
+    async def call(self, module, entry, arg=None):
         module_id, entry_id = \
             await asyncio.gather(module.id, module.get_entry_id(entry))
-        payload = self.__pack_int(module_id) + self.__pack_int(entry_id)
+        payload = self.__pack_int(module_id) + \
+                  self.__pack_int(entry_id)  + \
+                  (b'' if arg is None else arg)
+
         await self.__send_reactive_command(
                     _ReactiveCommand.Call, payload,
                     log=('Sending call command to %s:%s (%s:%s) on %s',

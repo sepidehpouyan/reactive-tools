@@ -59,8 +59,8 @@ class Module:
     async def get_entry_id(self, entry_name):
         return await self._get_entry_id(entry_name)
 
-    async def call(self, entry):
-        return await self.node.call(self, entry)
+    async def call(self, entry, arg=None):
+        return await self.node.call(self, entry, arg)
 
     def __check_init_args(self, node, binary, id, symtab, key):
         if not isinstance(node, self.get_supported_node_type()):
