@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import binascii
 from enum import Enum
 from collections import namedtuple
 
@@ -115,7 +116,10 @@ class SancusModule(Module):
         linked_binary = await self.__link()
 
         with open(linked_binary, 'rb') as f:
-            return sancus.crypto.get_sm_key(f, self.name, self.node.vendor_key)
+            key = sancus.crypto.get_sm_key(f, self.name, self.node.vendor_key)
+            logging.info('Module key for %s: %s',
+                         self.name, binascii.hexlify(key).decode('ascii'))
+            return key
 
     async def __link(self):
         linked_binary = tools.create_tmp(suffix='.elf')
