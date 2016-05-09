@@ -66,6 +66,10 @@ def _parse_args(args):
     deploy_parser.add_argument(
         '--result',
         help='File to write the resulting configuration to')
+    deploy_parser.add_argument(
+        '--deploy-in-order',
+        help='Deploy modules in the order they are found in the config file',
+        action='store_true')
 
     call_parser = subparsers.add_parser(
         'call',
@@ -97,6 +101,10 @@ def _handle_deploy(args):
     logging.info('Deploying %s', args.config)
 
     conf = config.load(args.config)
+
+    if args.deploy_in_order:
+        conf.deploy_modules_ordered()
+
     conf.install()
 
     if args.result is not None:

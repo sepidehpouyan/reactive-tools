@@ -39,12 +39,12 @@ class Module:
 
     @property
     async def id(self):
-        id, _ = await self.__deploy()
+        id, _ = await self.deploy()
         return id
 
     @property
     async def symtab(self):
-        _, symtab = await self.__deploy()
+        _, symtab = await self.deploy()
         return symtab
 
     @property
@@ -104,7 +104,7 @@ class Module:
                               '-o', binary, *objects.values())
         return binary
 
-    async def __deploy(self):
+    async def deploy(self):
         if self.__deploy_fut is None:
             self.__deploy_fut = asyncio.ensure_future(self.node.deploy(self))
 

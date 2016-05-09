@@ -50,6 +50,14 @@ class Config:
     def install(self):
         asyncio.get_event_loop().run_until_complete(self.install_async())
 
+    async def deploy_modules_ordered_async(self):
+        for module in self.modules:
+            await module.deploy()
+
+    def deploy_modules_ordered(self):
+        asyncio.get_event_loop().run_until_complete(
+                                self.deploy_modules_ordered_async())
+
 
 def load(file_name):
     with open(file_name, 'r') as f:
