@@ -17,13 +17,15 @@ class Error(Exception):
 
 
 class Module:
-    def __init__(self, name, files, node,
+    def __init__(self, name, files, cflags, ldflags, node,
                  binary=None, id=None, symtab=None, key=None):
 
         self.__check_init_args(node, binary, id, symtab, key)
 
         self.name = name
         self.files = files
+        self.cflags = cflags
+        self.ldflags = ldflags
         self.node = node
 
         self.__build_fut = self.__init_future(binary)
@@ -94,13 +96,15 @@ class Module:
         config = self._get_build_config(_get_verbosity())
         objects = {str(p): tools.create_tmp(suffix='.o') for p in self.files}
 
-        build_obj = lambda c, o: tools.run_async(config.cc, *config.cflags,
+        cflags = config.cflags + self.cflags
+        build_obj = lambda c, o: tools.run_async(config.cc, *cflags,
                                                  '-c', '-o', o, c)
         build_futs = [build_obj(c, o) for c, o in objects.items()]
         await asyncio.gather(*build_futs)
 
         binary = tools.create_tmp(suffix='.elf')
-        await tools.run_async(config.ld, *config.ldflags,
+        ldflags = config.ldflags + self.ldflags
+        await tools.run_async(config.ld, *ldflags,
                               '-o', binary, *objects.values())
         return binary
 
