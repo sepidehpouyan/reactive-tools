@@ -1,6 +1,0 @@
-reactive-tools deploy example.json --result result.json
-sancus-crypto --key <SM1 key> --mac buttons_driver <Contiki ELF>
-reactive-tools call --config result.json --module sm1 --entry init --arg <Previous output>
-sancus-crypto --key <SM2 key> --mac lcd_driver <Contiki ELF>
-reactive-tools call --config result.json --module sm2 --entry init --arg <Previous output>
-<Press the hell out of that button!>

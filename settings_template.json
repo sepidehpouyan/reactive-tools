@@ -1,0 +1,15 @@
+{
+    "linkable": true,
+    "random_nonce": false,
+    "use_platform_service": false,
+    "spid": "INSERT_SPID_HERE",
+    "primary_subscription_key": "INSERT_PRIMARY_KEY_HERE",
+    "secondary_subscription_key": "INSERT_SECONDARY_KEY_HERE",
+    "quote_trust_options": [
+        "GROUP_OUT_OF_DATE",
+        "CONFIGURATION_NEEDED"
+    ],
+    "sp_private_key_pem_path": "",
+    "ias_root_cert_pem_path": "INSERT_ROOT_CA_PATH_HERE",
+    "sigstruct_path": ""
+}

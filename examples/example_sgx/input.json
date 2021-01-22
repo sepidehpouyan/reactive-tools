@@ -1,0 +1,41 @@
+{
+    "nodes": [
+        {
+            "type": "sgx",
+            "name": "node1",
+            "ip_address": "127.0.0.1",
+            "reactive_port": 5000
+        }
+    ],
+    "modules" : [
+        {
+            "type": "sgx",
+            "name": "sm1",
+            "node": "node1",
+            "vendor_key": "<Insert path to your private key here>",
+            "ra_settings": "<Insert path to your settings JSON file here>"
+        },
+        {
+            "type": "sgx",
+            "name": "sm2",
+            "node": "node1",
+            "vendor_key": "<Insert path to your private key here>",
+            "ra_settings": "<Insert path to your settings JSON file here>"
+        }
+    ],
+    "connections" : [
+      {
+          "from_module": "sm1",
+          "from_output": "output",
+          "to_module": "sm2",
+          "to_input": "input",
+          "encryption": "aes"
+      },
+      {
+          "direct": true,
+          "to_module": "sm2",
+          "to_input": "input",
+          "encryption": "aes"
+      }
+    ]
+}

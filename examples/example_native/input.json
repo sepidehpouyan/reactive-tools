@@ -1,0 +1,37 @@
+{
+    "nodes": [
+        {
+            "type": "native",
+            "name": "node1",
+            "ip_address": "127.0.0.1",
+            "reactive_port": 5000
+        }
+    ],
+    "modules" : [
+        {
+            "type": "native",
+            "name": "sm1",
+            "node": "node1"
+        },
+        {
+            "type": "native",
+            "name": "sm2",
+            "node": "node1"
+        }
+    ],
+    "connections" : [
+      {
+          "from_module": "sm1",
+          "from_output": "output",
+          "to_module": "sm2",
+          "to_input": "input",
+          "encryption": "aes"
+      },
+      {
+          "direct": true,
+          "to_module": "sm2",
+          "to_input": "input",
+          "encryption": "aes"
+      }
+    ]
+}

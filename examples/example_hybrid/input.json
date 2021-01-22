@@ -1,0 +1,70 @@
+{
+    "nodes": [
+        {
+            "type": "native",
+            "name": "node1",
+            "ip_address": "127.0.0.1",
+            "reactive_port": 5000
+        },
+        {
+            "type": "sancus",
+            "name": "node2",
+            "ip_address": "127.0.0.1",
+            "vendor_id": 4660,
+            "vendor_key": "0b7bf3ae40880a8be430d0da34fb76f0",
+            "reactive_port": 6000
+        }
+    ],
+    "modules" : [
+        {
+            "type": "native",
+            "name": "sm1",
+            "node": "node1",
+        },
+        {
+            "type": "native",
+            "name": "sm2",
+            "node": "node1",
+        },
+        {
+            "type": "sancus",
+            "name": "sm3",
+            "files": ["sm3.c"],
+            "node": "node2"
+        },
+        {
+            "type": "sancus",
+            "name": "sm4",
+            "files": ["sm4.c"],
+            "node": "node2"
+        }
+    ],
+    "connections": [
+      {
+          "from_module": "sm1",
+          "from_output": "output1",
+          "to_module": "sm3",
+          "to_input": "input3",
+          "encryption": "spongent"
+      },
+      {
+          "from_module": "sm4",
+          "from_output": "output4",
+          "to_module": "sm2",
+          "to_input": "input2",
+          "encryption": "spongent"
+      },
+      {
+          "direct": true,
+          "to_module": "sm3",
+          "to_input": "input3",
+          "encryption": "spongent"
+      },
+      {
+          "direct": true,
+          "to_module": "sm2",
+          "to_input": "input2",
+          "encryption": "aes"
+      }
+    ]
+}

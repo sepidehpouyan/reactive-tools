@@ -1,0 +1,43 @@
+{
+    "nodes": [
+        {
+            "type": "sancus",
+            "name": "node1",
+            "ip_address": "127.0.0.1",
+            "vendor_id": 4660,
+            "vendor_key": "0b7bf3ae40880a8be430d0da34fb76f0",
+            "reactive_port": 5000
+        }
+    ],
+    "modules" : [
+        {
+            "type": "sancus",
+            "name": "sm1",
+            "files": ["sm1.c"],
+            "node": "node1"
+        },
+        {
+            "type": "sancus",
+            "name": "sm2",
+            "files": ["sm2.c"],
+            "node": "node1"
+        }
+    ],
+    "connections": [
+      {
+          "from_module": "sm2",
+          "from_output": "output",
+          "to_module": "sm1",
+          "to_input": "input",
+          "encryption": "spongent"
+      },
+      {
+          "direct": true,
+          "to_module": "sm1",
+          "to_input": "input",
+          "encryption": "spongent"
+      }
+    ],
+    "periodic-events": [
+    ]
+}
