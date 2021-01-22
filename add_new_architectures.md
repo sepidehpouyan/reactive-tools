@@ -8,7 +8,7 @@ This file provides an example of what it is necessary to do in this case. We'll 
 
 The scripts use massively `asyncio` framework, which is a powerful tool to perform asynchronous operations (like opening a file, connecting to a remote host, executing a subprocess..).
 
-All the common methods that you need to implement are asynchronous (defined with the `async` keyword), but it is not mandatory to actually use asynchronous operations (so, you can implement those methods as normal ones).
+**All** the common methods that you need to implement are asynchronous (defined with the `async` keyword), but it is not mandatory to actually use asynchronous operations (so, you can implement those methods as normal ones).
 
 However, it is _highly recommended_ to use as much concurrency as possible, to speed up significantly the deployment process.
 
@@ -16,56 +16,51 @@ However, it is _highly recommended_ to use as much concurrency as possible, to s
 
 Add a python file called `trustzone.py` in `modules` folder, defining a new class called `TrustZoneModule`, which extends the base class `Module` (defined in `base.py`). Also, import the module in the `__init__.py`, so that the Module will be in the scope of `modules` .
 
-
+**Abstract methods**
 
 The following abstract methods need to be implemented:
 
 - `deploy(self)`
 
   - This method should eventually call the `deploy` method of its node
-
 - `call(self, entry, arg=None)`
 
   - This method should eventually call the `call` method of its node
   - `entry`: entrypoint name
   - `arg`: optional argument, which must be a byte array
-
 - `get_id(self)`
-
-  - returns the ID of the module
-
+- returns the ID of the module
 - `get_input_id(self, input)`
 
   - returns the input ID
-
 - `get_output_id(self, output)`
 
   - returns the output ID
-
 - `get_entry_id(self, entry)`
-
-  - returns the entrypoint ID
-
+- returns the entrypoint ID
+- `get_request_id(self, request)`
+  - returns the request ID, or raise an exception if the architecture does not support _request-handler_ connections
+- `get_handler_id(self, handler)`
+  - returns the handler ID, or raise an exception if the architecture does not support _request-handler_ connections
 - `get_key(self)`
 
   - returns the module's Master Key
-
 - `get_supported_encryption()` - _static method_
 
   - should return a list of `connection.Encryption` elements, describing which encryption algorithms are supported by the module
-
 - `get_supported_node_type()` - _static method_
 
   - should return the node class supported by the module
 
-
+**Common attributes**
 
 All modules have also some common attributes, which are:
 
 - `name`: module name. Specified in the input JSON file
 - `node`: node the module belongs to. It is a `Node` object. Node's name is specified in the input JSON file.
-
-
+- `priority`: a priority can be defined in the deployment descriptor for deploying modules in a specific order. This is automatically managed elsewhere
+- `deployed`: we can as well have declared in the deployment descriptor modules that have already been deployed previously. This is particularly useful for the Sancus Secure I/O functionality. Apart from that, managing already deployed modules still has to be implemented properly, therefore for the moment it is not really used
+- `connections`: number of connections of the module, as declared in the deployment descriptor. This value is assigned elsewhere. Particularly useful for Sancus, probably useless for other architectures.
 
 For all the other methods/attributes, the developer can choose his own implementation.
 
@@ -73,16 +68,39 @@ For all the other methods/attributes, the developer can choose his own implement
 
 Add a python file called `trustzone.py` in `nodes` folder, defining a new class called `TrustZoneNode`, which extends the base class `Node` (defined in `base.py`).  Also, import the module in the `__init__.py`, so that the Module will be in the scope of `node` .
 
+**Methods already implemented**
 
+The base class already provides a default implementation for some methods. However, if needed, this implementation can be overridden in the derived class:
+
+- `connect(self, from_module, from_output, to_module, to_input)`
+  - Send to the Event Manager of the node a new connection between modules
+  - `from_module` and `to_module` are objects of the `Module` class
+  - `from_output` and `to_input` are strings (not ids)
+- `call(self, module, entry, arg=None)`
+  - `module`: `Module` object
+  - `entry`: entrypoint name
+  - `arg`: optional argument, which is a byte array
+- `output(self, connection, arg=None)`
+  - `connection`: Connection object
+  - `arg`: optional argument, which is a byte array
+- `request(self, connection, arg=None)`
+  - `connection`: Connection object
+  - `arg`: optional argument, which is a byte array
+- `register_entrypoint(self, module, entry, frequency)`
+  - `module`: Module object
+  - `entry`: name of the entry point
+  - `frequency`: frequency (int)
+- `_send_reactive_command(self, command, log=None)`
+  - You should use this function to send any commands to the Event Manager
+  - `command`: Command object
+  - `log`: optional string that is printed to stdout for information
+
+**Abstract methods**
 
 The following abstract methods need to be implemented:
 
 - `deploy(self, module)`
   - Ideally, in this method we send the binary of `module` to the node
-- `connect(self, from_module, from_output, to_module, to_input)`
-  - Send to the Event Manager of the node a new connection between modules
-  - `from_module` and `to_module` are objects of the `Module` class
-  - `from_output` and `to_input` are strings (not ids)
 - `set_key(self, module, io_name, encryption, key, conn_io)`
   - Set the key for a connection. A message to `module` has to be sent through the Event Manager
   - `io_name`: name of the input/output
@@ -90,12 +108,8 @@ The following abstract methods need to be implemented:
   - `key`: connection key
   - `conn_io`: specifies if `io_name` is an output or an input. See `connection.ConnectionIO`
 
-- `call(self, module, entry, arg=None)`
-  - `module`: `Module` object
-  - `entry`: entrypoint name
-  - `arg`: optional argument, which is a byte array
 
-
+**Common attributes**
 
 All nodes have also some common attributes, which are:
 
@@ -104,15 +118,19 @@ All nodes have also some common attributes, which are:
 - `reactive_port`: port the Event Manager listens to events from. Specified in the input JSON file
 - `deploy_port`: port the Module Loader listens from. Specified in the input JSON file
 
-
+- `__nonces`: a map of nonces for every module of the same node.
+- `need_lock`: a boolean that says if a node needs to perform requests one at a time. Used for Sancus.
 
 For all the other methods/attributes, the developer can choose his own implementation.
 
 ## Add new encryption types
 
-In `connection.py` we can add new encryption algorithms in the `Encryption` enum class. If you need to add a new algorithm, modify this class accordingly.
+In `crypto.py` we can add new encryption algorithms in the `Encryption` enum class. If you need to add a new algorithm, modify this class accordingly.
 
 Note that two modules can be connected using a specific encryption **only** if both of them support it. If, for example, you want to connect a SGX module with a TrustZone module using an encryption algorithm X, you have to:
+
+- Implement the crypto functions in `crypto.py` for encryption, decryption, MAC
+- Update the methods of the `Encryption` class to include support for this new encryption type (just look at the existing code, and modify it accordingly)
 
 - Implement that encryption algorithm in the modules code
   - For SGX/Native modules, just update the [`reactive_crypto`](https://github.com/gianlu33/rust-sgx-libs/tree/master/reactive_crypto) library
@@ -177,4 +195,4 @@ If you need to import an external python module you are completely allowed to do
 
 In this way, if we don't use a specific architecture we are not forced to install its modules, and the scripts will work without it as well.
 
-E.g. If i don't use Sancus modules in my system, i don't need to install Sancus compiler and its python library to run the scripts.
+E.g. If I don't use Sancus modules in my system, I don't need to install Sancus compiler and its python library to run the scripts.

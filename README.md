@@ -1,94 +1,96 @@
 # reactive-tools
 
-Tools for Authentic Execution work. [Website](https://people.cs.kuleuven.be/~jantobias.muehlberg/stm17/)
+Deployment tools for the [Authentic Execution framework](https://github.com/gianlu33/authentic-execution)
 
 ## Support
 
 Currently, the following architectures are supported:
 
 - Sancus
-- Intel SGX
-- Normal computers ("No-SGX", for testing purposes)
+- SGX
+- Native (no TEE support, run natively)
 
-### Extending support for new architectures
+[Extending support for new architectures](add_new_architectures.md)
 
-See [here](add_new_architectures.md)
+[Tutorial: develop an Authentic Execution application](https://github.com/gianlu33/authentic-execution/blob/master/docs/tutorial-develop-apps.md)
 
-## Requirements
+### Limitations
 
-### Target devices
+- Currently, SGX modules can only be deployed in debug mode
 
-**Sancus**
+## Dependencies & installation
 
-- [Reactive application](https://github.com/fritzalder/sancus-riot/tree/reactive-app/sancus-testbed/reactive)
-  - Event Manager & Module Loader running on top of RIOT OS port for Sancus
+- [Full list of dependencies](https://github.com/gianlu33/authentic-execution/blob/master/docs/install-from-sources.md)
 
-**Intel SGX**
+```bash
+# Install reactive-tools - you must be at the root of this repository
+pip install .
+```
 
-- [Rust](https://www.rust-lang.org/tools/install) - to run the event manager
-- [Fortanix EDP](https://edp.fortanix.com/docs/installation/guide/) - to run SGX enclaves
-- [Event Manager](https://github.com/gianlu33/rust-sgx-apps)
+## Run reactive-tools with Docker
 
-**Native**
+The [gianlu33/reactive-tools](https://hub.docker.com/repository/docker/gianlu33/reactive-tools) Docker images provide a simple and fast way to run reactive-tools from any Linux OS. We provide different tags, according to the developer needs:
 
-- [Rust](https://www.rust-lang.org/tools/install) - to run the event manager
-- [Event Manager](https://github.com/gianlu33/rust-sgx-apps)
+- `latest` contains all the dependencies for all the architectures supported
+- `sgx` contains the dependencies to deploy only SGX and native modules
+- `native` contains dependencies to deploy only native modules
+- `sancus` contains dependencies to deploy only Sancus modules
 
-### Deployer
+When running the Docker image, ideally you should mount a volume that includes the workspace of the application to be deployed, containing all the source files and the deployment descriptor.
 
-**Note**: you only need to install the dependencies of the architectures you are interested in.
-
-- e.g. if your system only works with Sancus devices, you don't need Fortanix EDP
-
-**Sancus**
-
-- [Sancus compiler](https://distrinet.cs.kuleuven.be/software/sancus/install.php)
-  - You also need to add to add the python library to `PYTHONPATH`
-    - `export PYTHONPATH=$PYTHONPATH:/usr/local/share/sancus-compiler/python/lib/`
-
-**Intel SGX/Native**
-
-- Rust & Fortanix EDP
-- [`rust-sgx-gen`](https://github.com/gianlu33/rust-sgx-gen/) - code generation tool
-
-- [Utility apps](https://github.com/gianlu33/rust-sgx-apps) - `aes_encryptor`, `ra_client` and `ra_sp`
-  - needed for connection key encryption and remote attestation
-  - Simply run the `install_deployer.sh` script in the `apps` folder
-- See [here](sgx.md) for more details
+```bash
+# run reactive-tools image
+### <volume>: volume we want to mount (ideally, contains the workspace of our app)
+### <tag>: tag of the image we want to run between {latest,sgx,sancus,native}
+make run VOLUME=<volume> TAG=<tag>
+```
 
 ## Run
 
-Install `reactive-tools` by running `pip install .` from the root folder.
+All of the following commands can be run with either the `--verbose` or `--debug` flags, for debugging purposes. For a full description of the arguments, run `reactive-tools -h`.
 
-### Deploy an Authentic Execution network
+### Build
 
-**Inputs**
+```bash
+# Build the application. Might be useful to check that all the modules compile before the actual deployment
+### <workspace>: root directory of the application to deploy. Default: "."
+### <config>: name of the input deployment descriptor, should be inside <workspace>
+reactive-tools build --workspace <workspace> <config>
+```
 
-- Code for each module
-- JSON file describing the configuration of the system
-- see [examples](examples)
+### Deploy
+```bash
+# Deploy the application
+### <workspace>: root directory of the application to deploy. Default: "."
+### <config>: name of the deployment descriptor, should be inside <workspace>
+### <result>: path to the output deployment descriptor that will be generated (optional)
+reactive-tools deploy --workspace <workspace> <config> --result <result>
+```
 
-**Command**
+### Call
+```bash
+# Call a specific entry point of a deployed application
+### <config>: deployment descriptor. MUST be the output of a previous deploy command
+### <module_name>: name of the module we want to call
+### <entry_point>: either the name or the ID of th entry point we want to call
+### <arg>: byte array in hexadecimal format, e.g., "deadbeef" (OPTIONAL)
+reactive-tools call --config <config> --module <module_name> --entry <entry_point> --arg <arg>
+```
 
-Run `reactive-tools deploy -h` for more information
+### Output
+```bash
+# Trigger the output of a _direct_ connection
+### <config>: deployment descriptor. MUST be the output of a previous deploy command
+### <connection>: either the name or the ID of the connection
+### <arg>: byte array in hexadecimal format, e.g., "deadbeef" (OPTIONAL)
+reactive-tools output --config <config> --connection <connection> --arg <arg>
+```
 
-**Output**
-
-- If everything goes well, your modules will be automatically loaded inside the nodes you specified, and connections will be established!
-- If you specified an output file (`--result <file>`), the final configuration will be saved in a JSON format (which includes all information you may need such as keys, binaries, etc)
-
-### Call an entrypoint
-
-**Inputs**
-
-- Result JSON of the `deploy` command
-- Module and entry name
-- Optional argument (hex byte array)
-
-**Command**
-
-Run `reactive-tools call -h` for more information
-
-**Output**
-
-- If everything goes well, the entrypoint is correctly called
+### Request
+```bash
+# Trigger the request of a _direct_ connection
+### <config>: deployment descriptor. MUST be the output of a previous deploy command
+### <connection>: either the name or the ID of the connection
+### <arg>: byte array in hexadecimal format, e.g., "deadbeef" (OPTIONAL)
+reactive-tools request --config <config> --connection <connection> --arg <arg>
+```
