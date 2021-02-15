@@ -4,7 +4,7 @@ setup(
     name='reactivetools',
     version='0.1',
     packages=find_packages(),
-    install_requires=['pyelftools==0.27', 'aiofile==3.3.3'],
+    install_requires=['pyelftools==0.27', 'aiofile==3.3.3', 'pycryptodome==3.10.1'],
     entry_points={
         'console_scripts': ['reactive-tools = reactivetools.cli:main']
     },

@@ -1,6 +1,7 @@
 import base64
 import asyncio
 from enum import IntEnum
+from Crypto.Cipher import AES
 
 from . import tools
 from . import glob
@@ -55,23 +56,22 @@ class Encryption(IntEnum):
 
 
 async def encrypt_aes(key, ad, data=[]):
-    args = [base64.b64encode(ad).decode(),
-            base64.b64encode(data).decode(),
-            base64.b64encode(key).decode()]
+    # Note: we set nonce to zero because our nonce is part of the associated data
+    aes_gcm = AES.new(key, AES.MODE_GCM, nonce=b'\x00'*12)
+    aes_gcm.update(ad)
 
-    out = await tools.run_async_output(glob.ENCRYPTOR, *args)
-    return base64.b64decode(out)
+    cipher, tag = aes_gcm.encrypt_and_digest(data)
+    return cipher + tag
 
 
 async def decrypt_aes(key, ad, data=[]):
-    args = [base64.b64encode(ad).decode(),
-            base64.b64encode(data).decode(),
-            base64.b64encode(key).decode(),
-            "-d"]
-
     try:
-        out = await tools.run_async_output(glob.ENCRYPTOR, *args)
-        return base64.b64decode(out)
+        aes_gcm = AES.new(key, AES.MODE_GCM, nonce=b'\x00'*12)
+        aes_gcm.update(ad)
+
+        cipher = data[:-16]
+        tag = data[-16:]
+        return aes_gcm.decrypt_and_verify(cipher, tag)
     except:
         raise Error("Decryption failed")
 
