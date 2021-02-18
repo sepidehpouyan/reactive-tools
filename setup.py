@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="reactive-tools",
-    version="0.1",
+    version="0.2",
     author="Gianluca Scopelliti",
     author_email="gianlu.1033@gmail.com",
     description="Deployment tools for the Authentic Execution framework",
