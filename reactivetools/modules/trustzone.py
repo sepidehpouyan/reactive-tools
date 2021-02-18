@@ -46,7 +46,7 @@ class TrustZoneModule(Module):
         inputs = mod_dict.get('inputs')
         outputs = mod_dict.get('outputs')
         entrypoints = mod_dict.get('entrypoints')
-        return TrustZoneModule(name, node, priority, deployed, nonce, attested, files_dir, 
+        return TrustZoneModule(name, node, priority, deployed, nonce, attested, files_dir,
                                 binary, id, key, inputs, outputs, entrypoints)
 
 
@@ -73,7 +73,7 @@ class TrustZoneModule(Module):
     @property
     async def binary(self):
         return await self.build()
-   
+
     # --- Implement abstract methods --- #
 
     async def build(self):
@@ -90,13 +90,13 @@ class TrustZoneModule(Module):
     async def attest(self):
         if self.__attest_fut is None:
             self.__attest_fut = asyncio.ensure_future(self.node.attest(self))
-        
+
         return await self.__attest_fut
 
 
     async def get_id(self):
         return self.id
-        
+
     async def get_input_id(self, input):
         if isinstance(input, int):
             return input
@@ -143,7 +143,7 @@ class TrustZoneModule(Module):
     def get_supported_encryption():
         return [Encryption.AES, Encryption.SPONGENT]
 
-     # --- Other methods --- #       
+     # --- Other methods --- #
 
     async def __build(self):
         hex = '%032x' % (self.id)
