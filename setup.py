@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="reactive-tools",
-    version="0.2",
+    version="0.2.1",
     author="Gianluca Scopelliti",
     author_email="gianlu.1033@gmail.com",
     description="Deployment tools for the Authentic Execution framework",
@@ -27,5 +27,8 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
-    include_package_data=True
+    include_package_data=True,
+    entry_points={
+        'console_scripts': ['reactive-tools = reactivetools.cli:main']
+    }
 )
