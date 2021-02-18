@@ -10,18 +10,17 @@ from .base import Module
 from ..nodes import SancusNode
 from .. import tools
 from ..crypto import Encryption
-
+from ..dumpers import *
+from ..loaders import *
 
 class Error(Exception):
     pass
 
 
 class SancusModule(Module):
-    def __init__(self, name, node, priority, deployed, files, cflags, ldflags,
-                 binary=None, id=None, symtab=None, key=None):
-        super().__init__(name, node, priority, deployed)
-
-        self.__check_init_args(node, binary, id, symtab, key)
+    def __init__(self, name, node, priority, deployed, nonce, files, cflags,
+            ldflags, binary, id, symtab, key):
+        super().__init__(name, node, priority, deployed, nonce)
 
         self.files = files
         self.cflags = cflags
@@ -30,6 +29,44 @@ class SancusModule(Module):
         self.__build_fut = tools.init_future(binary)
         self.__deploy_fut = tools.init_future(id, symtab)
         self.__key_fut = tools.init_future(key)
+
+
+    @staticmethod
+    def load(mod_dict, node_obj):
+        name = mod_dict['name']
+        node = node_obj
+        priority = mod_dict.get('priority')
+        deployed = mod_dict.get('deployed')
+        nonce = mod_dict.get('nonce')
+        files = load_list(mod_dict['files'],
+                           lambda f: parse_file_name(f))
+        cflags = load_list(mod_dict.get('cflags'))
+        ldflags = load_list(mod_dict.get('ldflags'))
+        binary = parse_file_name(mod_dict.get('binary'))
+        id = mod_dict.get('id')
+        symtab = parse_file_name(mod_dict.get('symtab'))
+        key = parse_key(mod_dict.get('key'))
+        
+        return SancusModule(name, node, priority, deployed, nonce, files, cflags,
+                ldflags, binary, id, symtab, key)
+
+
+    def dump(self):
+        return {
+            "type": "sancus",
+            "name": self.name,
+            "node": self.node.name,
+            "priority": self.priority,
+            "deployed": self.deployed,
+            "nonce": self.nonce,
+            "files": dump(self.files),
+            "cflags": dump(self.cflags),
+            "ldflags": dump(self.ldflags),
+            "binary": dump(self.binary),
+            "id": dump(self.id),
+            "symtab": dump(self.symtab),
+            "key": dump(self.key)
+        }
 
 
     # --- Properties --- #
@@ -72,10 +109,6 @@ class SancusModule(Module):
         return await self.__deploy_fut
 
 
-    async def call(self, entry, arg=None):
-        return await self.node.call(self, entry, arg)
-
-
     async def get_id(self):
         return await self.id
 
@@ -96,21 +129,13 @@ class SancusModule(Module):
         return await self._get_entry_id(entry)
 
 
-    async def get_request_id(self, request):
-        raise Error("Requests not supported in Sancus")
-
-
-    async def get_handler_id(self, handler):
-        raise Error("Handlers not supported in Sancus")
-
-
     async def get_key(self):
         return await self.key
 
 
     @staticmethod
-    def get_supported_node_type():
-        return SancusNode
+    def get_supported_nodes():
+        return [SancusNode]
 
 
     @staticmethod
@@ -146,21 +171,6 @@ class SancusModule(Module):
         return await self._get_io_id(io)
 
 
-    def __check_init_args(self, node, binary, id, symtab, key):
-        if not isinstance(node, self.get_supported_node_type()):
-            clsname = lambda o: type(o).__name__
-            raise Error('A {} cannot run on a {}'
-                    .format(clsname(self), clsname(node)))
-
-        # For now, either all optionals should be given or none. This might be
-        # relaxed later if necessary.
-        optionals = (binary, id, symtab, key)
-
-        if None in optionals and any(map(lambda x: x is not None, optionals)):
-            raise Error('Either all of the optional node parameters '
-                        'should be given or none')
-
-
     async def __build(self):
         logging.info('Building module %s from %s',
                      self.name, ', '.join(map(str, self.files)))
@@ -191,7 +201,7 @@ class SancusModule(Module):
         try:
             import sancus.crypto
         except:
-            raise Error("Cannot import sancus.crypto! Maybe the Sancus toolchain is not installed, or python modules are not in PYTHONPATH")
+            raise Error("Sancus python libraries not found in PYTHONPATH")
 
         linked_binary = await self.__link()
 

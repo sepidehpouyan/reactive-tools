@@ -9,6 +9,19 @@ from ..nodes import SGXNode
 from .. import tools
 from .. import glob
 from ..crypto import Encryption
+from ..dumpers import *
+from ..loaders import *
+
+# Apps
+RA_SP = "ra_sp"
+RA_CLIENT = "ra_client"
+
+# SGX build/sign
+SGX_TARGET = "x86_64-fortanix-unknown-sgx"
+BUILD_APP = "cargo build {{}} {{}} --target={} --manifest-path={{}}/Cargo.toml".format( SGX_TARGET)
+CONVERT_SGX = "ftxsgx-elf2sgxs {} --heap-size 0x20000 --stack-size 0x20000 --threads 4 {}"
+SIGN_SGX = "sgxs-sign --key {} {} {} {} --xfrm 7/0 --isvprodid 0 --isvsvn 0"
+
 
 class Object():
     pass
@@ -20,8 +33,8 @@ class Error(Exception):
 async def _generate_sp_keys():
     dir = tools.create_tmp_dir()
 
-    priv = "{}/private_key.pem".format(dir)
-    pub = "{}/public_key.pem".format(dir)
+    priv = os.path.join(dir, "private_key.pem")
+    pub = os.path.join(dir, "public_key.pem")
 
     cmd = "ssh-keygen"
     args_private = "-t rsa -f {} -b 2048 -N ''".format(priv).split()
@@ -36,25 +49,23 @@ async def _generate_sp_keys():
 async def _run_ra_sp():
     # kill old ra_sp (if running)
     try:
-        await tools.run_async("pkill", "-f", glob.RA_SP)
+        await tools.run_async("pkill", "-f", RA_SP)
     except:
         pass
 
     arg = await SGXModule._get_ra_sp_priv_key()
 
-    return await tools.run_async_background(glob.RA_SP, arg)
+    return await tools.run_async_background(RA_SP, arg)
 
 
 class SGXModule(Module):
     _sp_keys_fut = asyncio.ensure_future(_generate_sp_keys())
     _ra_sp_fut = asyncio.ensure_future(_run_ra_sp())
 
-    def __init__(self, name, node, priority, deployed, vendor_key, ra_settings,
-                    features, id=None, binary=None, key=None, sgxs=None,
-                    signature=None, data=None):
-        super().__init__(name, node, priority, deployed)
-
-        self.__check_init_args(node, id, binary, key, sgxs, signature, data)
+    def __init__(self, name, node, priority, deployed, nonce, vendor_key,
+                ra_settings, features, id, binary, key, sgxs, signature, data,
+                folder):
+        super().__init__(name, node, priority, deployed, nonce)
 
         self.__deploy_fut = tools.init_future(id) # not completely true
         self.__generate_fut = tools.init_future(data)
@@ -67,8 +78,50 @@ class SGXModule(Module):
         self.features = [] if features is None else features
         self.id = id if id is not None else node.get_module_id()
         self.port = self.node.reactive_port + self.id
-        self.output = "build/{}".format(name)
+        self.output = os.path.join(os.getcwd(), "build", name)
+        self.folder = folder
 
+
+    @staticmethod
+    def load(mod_dict, node_obj):
+        name = mod_dict['name']
+        node = node_obj
+        priority = mod_dict.get('priority')
+        deployed = mod_dict.get('deployed')
+        nonce = mod_dict.get('nonce')
+        vendor_key = parse_file_name(mod_dict['vendor_key'])
+        settings = parse_file_name(mod_dict['ra_settings'])
+        features = mod_dict.get('features')
+        id = mod_dict.get('id')
+        binary = parse_file_name(mod_dict.get('binary'))
+        key = parse_key(mod_dict.get('key'))
+        sgxs = parse_file_name(mod_dict.get('sgxs'))
+        signature = parse_file_name(mod_dict.get('signature'))
+        data = mod_dict.get('data')
+        folder = mod_dict.get('folder') or name
+
+        return SGXModule(name, node, priority, deployed, nonce, vendor_key,
+                settings, features, id, binary, key, sgxs, signature, data, folder)
+
+    def dump(self):
+        return {
+            "type": "sgx",
+            "name": self.name,
+            "node": self.node.name,
+            "priority": self.priority,
+            "deployed": self.deployed,
+            "nonce": self.nonce,
+            "vendor_key": self.vendor_key,
+            "ra_settings": self.ra_settings,
+            "features": self.features,
+            "id": self.id,
+            "binary": dump(self.binary),
+            "sgxs": dump(self.sgxs),
+            "signature": dump(self.sig),
+            "key": dump(self.key),
+            "data": dump(self.data),
+            "folder": self.folder
+        }
 
     # --- Properties --- #
 
@@ -148,10 +201,6 @@ class SGXModule(Module):
         return await self.__build_fut
 
 
-    async def call(self, entry, arg=None):
-        return await self.node.call(self, entry, arg)
-
-
     async def deploy(self):
         if self.__deploy_fut is None:
             self.__deploy_fut = asyncio.ensure_future(self.node.deploy(self))
@@ -228,8 +277,8 @@ class SGXModule(Module):
 
 
     @staticmethod
-    def get_supported_node_type():
-        return SGXNode
+    def get_supported_nodes():
+        return [SGXNode]
 
 
     @staticmethod
@@ -254,7 +303,7 @@ class SGXModule(Module):
 
 
     @staticmethod
-    async def kill_ra_sp():
+    async def cleanup():
         try:
             process = await SGXModule._ra_sp_fut
             process.kill()
@@ -264,21 +313,6 @@ class SGXModule(Module):
 
 
     # --- Others --- #
-
-    def __check_init_args(self, node, id, binary, key, sgxs, signature, data):
-        if not isinstance(node, self.get_supported_node_type()):
-            clsname = lambda o: type(o).__name__
-            raise Error('A {} cannot run on a {}'
-                    .format(clsname(self), clsname(node)))
-
-        # For now, either all optionals should be given or none. This might be
-        # relaxed later if necessary.
-        optionals = (id, binary, key, sgxs, signature, data)
-
-        if None in optionals and any(map(lambda x: x is not None, optionals)):
-            raise Error('Either all of the optional node parameters '
-                        'should be given or none')
-
 
     async def generate_code(self):
         if self.__generate_fut is None:
@@ -295,7 +329,7 @@ class SGXModule(Module):
 
         args = Object()
 
-        args.input = self.name
+        args.input = self.folder
         args.output = self.output
         args.moduleid = self.id
         args.emport = self.node.deploy_port
@@ -312,14 +346,14 @@ class SGXModule(Module):
     async def __build(self):
         await self.generate_code()
 
-        features = ""
-        if self.features:
-            features = "--features " + " ".join(self.features)
+        release = "--release" if glob.get_build_mode() == glob.BuildMode.RELEASE else ""
+        features = "--features " + " ".join(self.features) if self.features else ""
 
-        cmd = glob.BUILD_SGX_APP.format(features, self.output).split()
+        cmd = BUILD_APP.format(release, features, self.output).split()
         await tools.run_async(*cmd)
 
-        binary = "{}/target/{}/{}/{}".format(self.output, glob.SGX_TARGET, glob.BUILD_MODE, self.name)
+        binary = os.path.join(self.output, "target", SGX_TARGET,
+                        glob.get_build_mode().to_str(), self.folder)
 
         logging.info("Built module {}".format(self.name))
 
@@ -328,12 +362,13 @@ class SGXModule(Module):
 
     async def __convert_sign(self):
         binary = await self.binary
+        debug = "--debug" if glob.get_build_mode() == glob.BuildMode.DEBUG else ""
 
         sgxs = "{}.sgxs".format(binary)
         sig = "{}.sig".format(binary)
 
-        cmd_convert = glob.CONVERT_SGX.format(binary).split()
-        cmd_sign = glob.SIGN_SGX.format(self.vendor_key, sgxs, sig).split()
+        cmd_convert = CONVERT_SGX.format(binary, debug).split()
+        cmd_sign = SIGN_SGX.format(self.vendor_key, sgxs, sig, debug).split()
 
         await tools.run_async(*cmd_convert)
         await tools.run_async(*cmd_sign)
@@ -347,10 +382,8 @@ class SGXModule(Module):
         await self.deploy()
         await self._ra_sp_fut
 
-        settings_abs = os.path.abspath(self.ra_settings)
-
-        args = [str(self.node.ip_address), str(self.port), settings_abs, await self.sig]
-        key = await tools.run_async_output(glob.RA_CLIENT, *args)
+        args = [str(self.node.ip_address), str(self.port), self.ra_settings, await self.sig]
+        key = await tools.run_async_output(RA_CLIENT, *args)
 
         logging.info("Done Remote Attestation of {}".format(self.name))
 

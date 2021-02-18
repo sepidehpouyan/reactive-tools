@@ -1,198 +1,140 @@
 # Add support for a new architecture
 
-It is quite easy to extend the scripts to support new architectures.
+In this tutorial, we will describe all the steps to do to add support for a new architecture.
 
-This file provides an example of what it is necessary to do in this case. We'll suppose to add support for ARM TrustZone.
+## Preliminary notes
 
-## Note before starting
+- **You MUST NOT modify** any existing files except for `modules/__init__.py` and `nodes/__init__.py`
+  - Your new architecture will be managed automatically
+  
+- If you need to install some python libraries through `pip`, add the name in the `install_requires` list in `setup.py` (line 16)
+  - Please declare a specific version! This way we don't risk that future updates break the app
+  
+- If you have some other external python libraries (e.g., the sancus python library), you need to add the path in your PYTHONPATH environment variable in order to use them
+  - Example: `  PYTHONPATH=$PYTHONPATH:/usr/local/share/sancus-compiler/python/lib/`
+  - If this is the case, **DO NOT** import a module at the beginning of your files, otherwise people that do not have such module would not be able to run the application. Instead, import the module inside the functions where you use it
+    - Example: `modules/sancus.py` at line 207
 
-The scripts use massively `asyncio` framework, which is a powerful tool to perform asynchronous operations (like opening a file, connecting to a remote host, executing a subprocess..).
+## High-level view of the steps to do
 
-**All** the common methods that you need to implement are asynchronous (defined with the `async` keyword), but it is not mandatory to actually use asynchronous operations (so, you can implement those methods as normal ones).
+- Fork this repository in your account
+- [optional] create a new branch, where you will implement your code
+- Implement & test code
+- Open a Pull Request (PR) from your branch to the `main` branch of **this** repository (not the one you forked!)
+- Wait for a review and, optionally, improve code
+- Update your code according to the review received
+- End: your code is merged to the main repo!
 
-However, it is _highly recommended_ to use as much concurrency as possible, to speed up significantly the deployment process.
+## Implementation
 
-## Implement Module class
+In this tutorial we will describe how to add support for the `TrustZone` architecture.
 
-Add a python file called `trustzone.py` in `modules` folder, defining a new class called `TrustZoneModule`, which extends the base class `Module` (defined in `base.py`). Also, import the module in the `__init__.py`, so that the Module will be in the scope of `modules` .
+### Add rules
 
-**Abstract methods**
+A rule file is a YAML file which contains some logical constraints about the definition of the deployment descriptor (nodes, modules, connections). Essentially, the purpose of these rules is to ensure that the deployment descriptor is structured as expected, and to give a meaningful error if something is wrong. 
 
-The following abstract methods need to be implemented:
+- All the rule files are stored in the `rules` folder.
 
-- `deploy(self)`
+- Examples of rules: 
+  - *each item in the `nodes` section of the deployment descriptor must provide a type, a name, an IP address and a port.* 
+  - *a port must be a positive 16-bit integer*
+- In `rules/default`, pre-defined rules are stored. For modules and nodes, we wrote some generic rules that all the types of nodes/modules should follow (e.g., for nodes, like in the example above)
+- In `rules/modules` and `rules/nodes` specific rules for specific architectures are stored (e.g., Sancus, SGX, etc..)
 
-  - This method should eventually call the `deploy` method of its node
-- `call(self, entry, arg=None)`
+**Your task**
 
-  - This method should eventually call the `call` method of its node
-  - `entry`: entrypoint name
-  - `arg`: optional argument, which must be a byte array
-- `get_id(self)`
-- returns the ID of the module
-- `get_input_id(self, input)`
+- **[required]** Create an empty `trustzone.yaml` file both in `rules/modules` and `rules/nodes`
+- [optional] Fill the files with your rules. These will be evaluated automatically at runtime.
+  - It's optional, but **recommended**
+  - Each rule is a key-value pair where the key is a string message that will be printed if the rule is not satisfied, and the value is your logical expression in **python code**
+    - To satisfy the rule, the expression must be evaluated to `True`
+    - Some helper functions are provided in `rules/evaluators.py`, which can be used
+    - Check the other rule files to get an idea of how to declare these rules
 
-  - returns the input ID
-- `get_output_id(self, output)`
+### Add Node and Module classes
 
-  - returns the output ID
-- `get_entry_id(self, entry)`
-- returns the entrypoint ID
-- `get_request_id(self, request)`
-  - returns the request ID, or raise an exception if the architecture does not support _request-handler_ connections
-- `get_handler_id(self, handler)`
-  - returns the handler ID, or raise an exception if the architecture does not support _request-handler_ connections
-- `get_key(self)`
+- **[required]** add a file called `trustzone.py` in the folder `nodes`
+  - This file has to declare a new class called `TrustZoneNode`, which extends the base class `Node`
+- **[required]** add a file called `trustzone.py` in the folder `modules`
+  - This file has to declare a new class called `TrustZoneModule`, which extends the base class `Module`
 
-  - returns the module's Master Key
-- `get_supported_encryption()` - _static method_
+These classes have to implement **at least** the abstract methods of the corresponding base classes, according to the description provided in the `base.py` files
+- For some methods, a default implementation is provided. If needed, you can override these methods in the subclasses
+- In the `__init__` function of your classes, **you must**  call `super().__init__(args)` , where args are the parameters of the `__init__` function in the base class (again, look at the `base.py`)
 
-  - should return a list of `connection.Encryption` elements, describing which encryption algorithms are supported by the module
-- `get_supported_node_type()` - _static method_
+### Update `__init__.py` files in `nodes/` and `modules/`
 
-  - should return the node class supported by the module
+To have your classes used by the application, you should modify these two files:
 
-**Common attributes**
+- `nodes/__init__.py` 
+- `modules/__init__.py`
 
-All modules have also some common attributes, which are:
+For both the files, the procedure is the same and very intuitive.
 
-- `name`: module name. Specified in the input JSON file
-- `node`: node the module belongs to. It is a `Node` object. Node's name is specified in the input JSON file.
-- `priority`: a priority can be defined in the deployment descriptor for deploying modules in a specific order. This is automatically managed elsewhere
-- `deployed`: we can as well have declared in the deployment descriptor modules that have already been deployed previously. This is particularly useful for the Sancus Secure I/O functionality. Apart from that, managing already deployed modules still has to be implemented properly, therefore for the moment it is not really used
-- `connections`: number of connections of the module, as declared in the deployment descriptor. This value is assigned elsewhere. Particularly useful for Sancus, probably useless for other architectures.
+- The examples below show how to update `modules/__init__.py`. For the same file under `nodes`, the procedure is analogous (just replace`module` with `node`)
 
-For all the other methods/attributes, the developer can choose his own implementation.
-
-## Implement Node class
-
-Add a python file called `trustzone.py` in `nodes` folder, defining a new class called `TrustZoneNode`, which extends the base class `Node` (defined in `base.py`).  Also, import the module in the `__init__.py`, so that the Module will be in the scope of `node` .
-
-**Methods already implemented**
-
-The base class already provides a default implementation for some methods. However, if needed, this implementation can be overridden in the derived class:
-
-- `connect(self, from_module, from_output, to_module, to_input)`
-  - Send to the Event Manager of the node a new connection between modules
-  - `from_module` and `to_module` are objects of the `Module` class
-  - `from_output` and `to_input` are strings (not ids)
-- `call(self, module, entry, arg=None)`
-  - `module`: `Module` object
-  - `entry`: entrypoint name
-  - `arg`: optional argument, which is a byte array
-- `output(self, connection, arg=None)`
-  - `connection`: Connection object
-  - `arg`: optional argument, which is a byte array
-- `request(self, connection, arg=None)`
-  - `connection`: Connection object
-  - `arg`: optional argument, which is a byte array
-- `register_entrypoint(self, module, entry, frequency)`
-  - `module`: Module object
-  - `entry`: name of the entry point
-  - `frequency`: frequency (int)
-- `_send_reactive_command(self, command, log=None)`
-  - You should use this function to send any commands to the Event Manager
-  - `command`: Command object
-  - `log`: optional string that is printed to stdout for information
-
-**Abstract methods**
-
-The following abstract methods need to be implemented:
-
-- `deploy(self, module)`
-  - Ideally, in this method we send the binary of `module` to the node
-- `set_key(self, module, io_name, encryption, key, conn_io)`
-  - Set the key for a connection. A message to `module` has to be sent through the Event Manager
-  - `io_name`: name of the input/output
-  - `encryption`: encryption algorithm ID (see below)
-  - `key`: connection key
-  - `conn_io`: specifies if `io_name` is an output or an input. See `connection.ConnectionIO`
-
-
-**Common attributes**
-
-All nodes have also some common attributes, which are:
-
-- `name`: node name. Specified in the input JSON file
-- `ip_address`: address of the node, which is either a `IPv4Address` or a `IPv6Address` (see [ipaddress](https://docs.python.org/3/library/ipaddress.html) library). Specified in the input JSON file
-- `reactive_port`: port the Event Manager listens to events from. Specified in the input JSON file
-- `deploy_port`: port the Module Loader listens from. Specified in the input JSON file
-
-- `__nonces`: a map of nonces for every module of the same node.
-- `need_lock`: a boolean that says if a node needs to perform requests one at a time. Used for Sancus.
-
-For all the other methods/attributes, the developer can choose his own implementation.
-
-## Add new encryption types
-
-In `crypto.py` we can add new encryption algorithms in the `Encryption` enum class. If you need to add a new algorithm, modify this class accordingly.
-
-Note that two modules can be connected using a specific encryption **only** if both of them support it. If, for example, you want to connect a SGX module with a TrustZone module using an encryption algorithm X, you have to:
-
-- Implement the crypto functions in `crypto.py` for encryption, decryption, MAC
-- Update the methods of the `Encryption` class to include support for this new encryption type (just look at the existing code, and modify it accordingly)
-
-- Implement that encryption algorithm in the modules code
-  - For SGX/Native modules, just update the [`reactive_crypto`](https://github.com/gianlu33/rust-sgx-libs/tree/master/reactive_crypto) library
-- Update the method `get_supported_encryption` of `SGXModule` and `TrustZoneModule`.
-
-## Update config.py
-
-Last thing we have to do is update `config.py` to correctly read/write a module or node from/to a JSON file.
-
-### Import Node and Module classes
-
-Simple as that.
-
-### Load node and module from the input JSON file
-
-You have to update `_node_load_funcs` and `_module_load_funcs` dicts
-
-- The key is the name of the architecture (as it appears on the input JSON)
-- The value is an handler, which will be called to load a Node / Module
-
-Example:
+**[required] Import your classes** 
 
 ```python
-_module_load_funcs = {
-    # other architectures..
-    'trustzone': _load_trustzone_module
+from .trustzone import TrustZoneModule
+```
+
+**[required] Declare your rules files**
+
+You should update the `module_rules`  and `node_rules` dicts as described below
+
+- **NOTE:** the key `"trustzone"` is the type of your node/module as written in the deployment descriptor
+
+```python
+module_rules = {
+    # ...
+	
+    # THIS is what you have to add:
+    "trustzone" : "trustzone.yaml"
 }
-
-def _load_trustzone_module(mod_dict, config):
-    name = mod_dict['name']
-    node = config.get_node(mod_dict['node'])
-    # other attributes..
-
-    return TrustZoneModule(name, node, ...)
 ```
 
-### Dump to output JSON file
+The application will automatically fetch the `trustzone.yaml` file inside the `rules/nodes` or `rules/modules` folders.
 
-You need a dumper for your Node and Module classes. Example:
+**[required] Declare your load function**
+
+The `load` function, declared as an abstract static method in the base class, takes as input the definition of the node/module as written in the deployment descriptor and creates the `TrustZoneNode` or `TrustZoneModule` object.
+
+- The `dump` function, instead, does the opposite work
+
+You should update the `module_funcs` and `node_funcs` as described below
+
+- **NOTE:** the key `"trustzone"` is the type of your node/module as written in the deployment descriptor
 
 ```python
-@_dump.register(TrustZoneModule)
-def _(module):
-	return {
-        "type": "trustzone",
-        "name": module.name,
-        # other attributes..
-    }
-
-@_dump.register(TrustZoneNode)
-def _(node):
-	return {
-        "type": "trustzone",
-        "name": node.name,
-        # other attributes..
-    }
+module_funcs = {
+    # ...
+	
+    # THIS is what you have to add:
+    "trustzone" : TrustZoneModule.load
+}
 ```
 
-## Import external Python modules
+**[optional] cleanup coroutines**
 
-If you need to import an external python module you are completely allowed to do it, but for specific modules (e.g. a TrustZone code generator) it is recommended to import the module **only** _inside_ the functions that use it.
+If your `Node` or `Module` classes need to perform certain operations before the application ends (e.g., kill some background process), you can add an entry in the `module_cleanup_coros` and `node_cleanup_coros` lists.
 
-In this way, if we don't use a specific architecture we are not forced to install its modules, and the scripts will work without it as well.
+- This is not required, but it is **recommended** to update these lists even if you do not have any task to do.
+- The `cleanup` method of your classes has a default implementation in the base class, therefore you do not have to implement new methods by yourself if you don't need to do any cleanup operations.
 
-E.g. If I don't use Sancus modules in my system, I don't need to install Sancus compiler and its python library to run the scripts.
+```python
+module_cleanup_coros = [
+    # ...
+	
+    # THIS is what you have to add:
+	TrustZoneModule.cleanup
+]
+```
+
+### Implement methods
+
+Now, you just have to implement all the abstract methods in your classes inherited from the base classes `Node` and `Module`. 
+
+- Check the `base.py` file for a description of the methods you have to override
+- Check other implementations (e.g., `sancus.py`) for some additional hints
+- You can of course implement new methods if needed, as well as override default implementation of methods in the base class

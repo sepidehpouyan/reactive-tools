@@ -1,0 +1,26 @@
+# PeriodicEvent rules
+
+## required keys ##
+module required:
+  is_present(dict, "module")
+
+entry required:
+  is_present(dict, "entry")
+
+frequency required:
+  is_present(dict, "frequency")
+
+
+## type of the required values ##
+module must be a str:
+  isinstance(dict["module"], str)
+
+entry must be a str:
+  isinstance(dict["entry"], str)
+
+frequency must be a positive u32:
+  is_positive_number(dict["frequency"], bits=32)
+
+established must be a bool:
+    not is_present(dict, "established") or
+    (is_present(dict, "established") and isinstance(dict["established"], bool))

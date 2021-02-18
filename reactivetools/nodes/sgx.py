@@ -3,6 +3,7 @@ import aiofile
 import logging
 from abc import ABC, abstractmethod
 import binascii
+import ipaddress
 
 from reactivenet import *
 
@@ -11,15 +12,28 @@ from ..connection import ConnectionIO
 from .. import glob
 from .. import tools
 from ..crypto import Encryption
+from ..dumpers import *
+from ..loaders import *
 
 class Error(Exception):
     pass
 
 class SGXBase(Node):
-    def __init__(self, name, ip_address, reactive_port, deploy_port):
+    def __init__(self, name, ip_address, reactive_port, deploy_port, module_id):
         super().__init__(name, ip_address, reactive_port, deploy_port)
 
-        self.__moduleid = 1
+        self.__moduleid = module_id if module_id else 1
+
+
+    def dump(self):
+        return {
+            "type": self.type,
+            "name": self.name,
+            "ip_address": str(self.ip_address),
+            "reactive_port": self.reactive_port,
+            "deploy_port": self.deploy_port,
+            "module_id": self.__moduleid
+        }
 
 
     @abstractmethod
@@ -33,7 +47,8 @@ class SGXBase(Node):
         await module.deploy()
 
         io_id = await conn_io.get_index(module)
-        nonce = self._get_nonce(module)
+        nonce = module.nonce
+        module.nonce += 1
 
         ad =    tools.pack_int8(encryption)                     + \
                 tools.pack_int16(conn_id)                       + \
@@ -68,8 +83,22 @@ class SGXBase(Node):
 
 
 class SGXNode(SGXBase):
+    type = "sgx"
+
+    @staticmethod
+    def load(node_dict):
+        name = node_dict['name']
+        ip_address = ipaddress.ip_address(node_dict['ip_address'])
+        reactive_port = node_dict['reactive_port']
+        deploy_port = node_dict.get('deploy_port', reactive_port)
+        module_id = node_dict.get('module_id')
+
+        return SGXNode(name, ip_address, reactive_port, deploy_port,
+                    module_id)
+
+
     async def deploy(self, module):
-        if module.deployed is not None:
+        if module.deployed:
             return
 
         async with aiofile.AIOFile(await module.sgxs, "rb") as f:
@@ -92,3 +121,5 @@ class SGXNode(SGXBase):
             command,
             log='Deploying {} on {}'.format(module.name, self.name)
             )
+
+        module.deployed = True

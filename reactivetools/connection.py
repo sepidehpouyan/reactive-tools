@@ -2,7 +2,12 @@ import asyncio
 import logging
 from enum import IntEnum
 
+from .dumpers import *
+from .loaders import *
+from .rules.evaluators import *
+
 from .crypto import Encryption
+from . import tools
 
 class Error(Exception):
     pass
@@ -39,10 +44,8 @@ class ConnectionIndex():
         return self.index
 
 class Connection:
-    cnt = 0
-
     def __init__(self, name, from_module, from_output, from_request, to_module,
-        to_input, to_handler, encryption, key, id, nonce, direct):
+        to_input, to_handler, encryption, key, id, nonce, direct, established):
         self.name = name
         self.from_module = from_module
         self.from_output = from_output
@@ -54,6 +57,7 @@ class Connection:
         self.key = key
         self.id = id
         self.nonce = nonce
+        self.established = established
 
         if direct:
             self.direct = True
@@ -66,11 +70,68 @@ class Connection:
         self.to_index = ConnectionIndex(ConnectionIO.INPUT, to_input) if to_input is not None \
             else ConnectionIndex(ConnectionIO.HANDLER, to_handler)
 
+
+    @staticmethod
+    def load(conn_dict, config):
+        direct = conn_dict.get('direct')
+        from_module = config.get_module(conn_dict['from_module']) if is_present(conn_dict, 'from_module') else None
+        from_output = conn_dict.get('from_output')
+        from_request = conn_dict.get('from_request')
+        to_module = config.get_module(conn_dict['to_module'])
+        to_input = conn_dict.get('to_input')
+        to_handler = conn_dict.get('to_handler')
+        encryption = Encryption.from_str(conn_dict['encryption'])
+        key = parse_key(conn_dict.get('key'))
+        nonce = conn_dict.get('nonce')
+        id = conn_dict.get('id')
+        established = conn_dict.get('established')
+
+        if not established:
+            id = config.connections_current_id # incremental ID
+            config.connections_current_id += 1
+            key = Connection.generate_key(from_module, to_module, encryption) # auto-generated key
+            nonce = 0 # only used for direct connections
+
+        name = conn_dict.get('name') or "conn{}".format(id)
+
+        if from_module is not None:
+            from_module.connections += 1
+        to_module.connections += 1
+
+        return Connection(name, from_module, from_output, from_request, to_module,
+            to_input, to_handler, encryption, key, id, nonce, direct, established)
+
+
+    def dump(self):
+        from_module = None if self.direct else self.from_module.name
+
+        return {
+            "name": self.name,
+            "from_module": from_module,
+            "from_output": self.from_output,
+            "from_request": self.from_request,
+            "to_module": self.to_module.name,
+            "to_input": self.to_input,
+            "to_handler": self.to_handler,
+            "encryption": self.encryption.to_str(),
+            "key": dump(self.key),
+            "id": self.id,
+            "direct": self.direct,
+            "nonce": self.nonce,
+            "established": self.established
+        }
+
+
     async def establish(self):
+        if self.established:
+            return
+
         if self.direct:
             await self.__establish_direct()
         else:
             await self.__establish_normal()
+
+        self.established = True
 
 
     async def __establish_normal(self):
@@ -102,7 +163,10 @@ class Connection:
 
 
     @staticmethod
-    def get_connection_id():
-        id = Connection.cnt
-        Connection.cnt += 1
-        return id
+    def generate_key(module1, module2, encryption):
+        if (module1 is not None and encryption not in module1.get_supported_encryption()) \
+            or encryption not in module2.get_supported_encryption():
+           raise Error('Encryption {} not supported between {} and {}'.format(
+                str(encryption), module1.name, module2.name))
+
+        return tools.generate_key(encryption.get_key_size())

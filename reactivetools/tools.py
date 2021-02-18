@@ -6,8 +6,6 @@ import base64
 import struct
 from enum import Enum
 
-sancus_key_size = None
-
 class ProcessRunError(Exception):
     def __init__(self, args, result):
         self.args = args
@@ -112,24 +110,6 @@ def create_tmp_dir():
 
 def generate_key(length):
     return os.urandom(length)
-
-
-def set_sancus_key_size(size):
-    global sancus_key_size
-
-    sancus_key_size = size
-
-
-def get_sancus_key_size():
-    if sancus_key_size is not None:
-        return sancus_key_size // 8
-
-    try:
-        import sancus.config
-    except:
-        raise Error("Sancus python lib not installed! Check README.md")
-
-    return sancus.config.SECURITY // 8
 
 
 def pack_int8(i):

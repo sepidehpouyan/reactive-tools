@@ -10,8 +10,8 @@ class Error(Exception):
     pass
 
 class Encryption(IntEnum):
-    AES         = 0x0
-    SPONGENT    = 0x1
+    AES         = 0x0 # aes-gcm-128
+    SPONGENT    = 0x1 # spongent-128
 
     @staticmethod
     def from_str(str):
@@ -34,7 +34,7 @@ class Encryption(IntEnum):
         if self == Encryption.AES:
             return 16
         if self == Encryption.SPONGENT:
-            return tools.get_sancus_key_size()
+            return 16
 
     async def encrypt(self, key, ad, data):
         if self == Encryption.AES:
@@ -80,7 +80,7 @@ async def encrypt_spongent(key, ad, data=[]):
     try:
         import sancus.crypto
     except:
-        raise Error("Cannot import sancus.crypto! Maybe the Sancus toolchain is not installed, or python modules are not in PYTHONPATH")
+        raise Error("Sancus python libraries not found in PYTHONPATH")
 
     cipher, tag = sancus.crypto.wrap(key, ad, data)
     return cipher + tag
@@ -91,10 +91,10 @@ async def decrypt_spongent(key, ad, data=[]):
         import sancus.crypto
         import sancus.config
     except:
-        raise Error("Cannot import sancus.crypto! Maybe the Sancus toolchain is not installed, or python modules are not in PYTHONPATH")
+        raise Error("Sancus python libraries not found in PYTHONPATH")
 
     # data should be formed like this: [cipher, tag]
-    tag_size = tools.get_sancus_key_size()
+    tag_size = sancus.config.SECURITY // 8
     cipher = data[:-tag_size]
     tag = data[-tag_size:]
 

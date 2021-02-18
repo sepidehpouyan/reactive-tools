@@ -1,0 +1,28 @@
+# Generic Node rules
+
+## required keys ##
+type required:
+  is_present(dict, "type")
+
+name required:
+  is_present(dict, "type")
+
+ip_address required:
+  is_present(dict, "ip_address")
+
+reactive_port required:
+  is_present(dict, "reactive_port")
+
+
+## type of the required values ##
+type must be a str:
+  isinstance(dict["type"], str)
+
+name must be a str:
+  isinstance(dict["name"], str)
+
+ip_address must be a str:
+  isinstance(dict["ip_address"], str)
+
+reactive_port must be a positive u16:
+  is_positive_number(dict["reactive_port"])

@@ -1,17 +1,37 @@
-# build mode
-BUILD_MODE = "debug"
+from enum import IntEnum
 
-# Apps
-RA_SP = "ra_sp"
-RA_CLIENT = "ra_client"
+class Error(Exception):
+    pass
 
-# SGX build/sign
-SGX_TARGET = "x86_64-fortanix-unknown-sgx"
+class BuildMode(IntEnum):
+    DEBUG       = 0
+    RELEASE     = 1
 
-RELEASE_FLAG = "{}".format("" if BUILD_MODE == "debug" else "--release")
-DEBUG_FLAG = "{}".format("--debug" if BUILD_MODE == "debug" else "")
+    @staticmethod
+    def from_str(mode):
+        mode_lower = mode.lower()
 
-BUILD_APP = "cargo build {} {{}} --manifest-path={{}}/Cargo.toml".format(RELEASE_FLAG)
-BUILD_SGX_APP = "{} --target={}".format(BUILD_APP, SGX_TARGET)
-CONVERT_SGX = "ftxsgx-elf2sgxs {{}} --heap-size 0x20000 --stack-size 0x20000 --threads 4 {}".format(DEBUG_FLAG)
-SIGN_SGX = "sgxs-sign --key {{}} {{}} {{}} {} --xfrm 7/0 --isvprodid 0 --isvsvn 0".format(DEBUG_FLAG)
+        if mode_lower == "debug":
+            return BuildMode.DEBUG
+        if mode_lower == "release":
+            return BuildMode.RELEASE
+
+        raise Error("Bad BuildMode: {}".format(mode))
+
+    def to_str(self):
+        if self == BuildMode.DEBUG:
+            return "debug"
+        if self == BuildMode.RELEASE:
+            return "release"
+
+        raise Error("BuildMode::to_str failed: this should never happen")
+
+
+__BUILD_MODE = BuildMode.DEBUG
+
+def set_build_mode(mode):
+    global __BUILD_MODE
+    __BUILD_MODE = BuildMode.from_str(mode)
+
+def get_build_mode():
+    return __BUILD_MODE

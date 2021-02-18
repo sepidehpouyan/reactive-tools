@@ -2,13 +2,15 @@ import asyncio
 import logging
 import binascii
 import aiofile
+import ipaddress
 from enum import IntEnum
 
 from reactivenet import *
 
 from .base import Node
 from .. import tools
-
+from ..dumpers import *
+from ..loaders import *
 
 class Error(Exception):
     pass
@@ -30,10 +32,35 @@ class SancusNode(Node):
         self.vendor_key = vendor_key
 
 
+    @staticmethod
+    def load(node_dict):
+        name = node_dict['name']
+        vendor_id = node_dict['vendor_id']
+        vendor_key = parse_key(node_dict['vendor_key'])
+        ip_address = ipaddress.ip_address(node_dict['ip_address'])
+        reactive_port = node_dict['reactive_port']
+        deploy_port = node_dict.get('deploy_port', reactive_port)
+
+        return SancusNode(name, vendor_id, vendor_key,
+                          ip_address, reactive_port, deploy_port)
+
+
+    def dump(self):
+        return {
+            "type": "sancus",
+            "name": self.name,
+            "ip_address": str(self.ip_address),
+            "vendor_id": self.vendor_id,
+            "vendor_key": dump(self.vendor_key),
+            "reactive_port": self.reactive_port,
+            "deploy_port": self.deploy_port
+        }
+
+
     async def deploy(self, module):
         assert module.node is self
 
-        if module.deployed is not None:
+        if module.deployed:
             return
 
         async with aiofile.AIOFile(await module.binary, "rb") as f:
@@ -68,6 +95,7 @@ class SancusNode(Node):
         with open(symtab_file, "wb") as f:
             f.write(symtab[:-1]) # Drop last 0 byte
 
+        module.deployed = True
         return sm_id, symtab_file
 
 
@@ -78,10 +106,12 @@ class SancusNode(Node):
         module_id, module_key, io_id = await asyncio.gather(
                                module.id, module.key, conn_io.get_index(module))
 
-        nonce = tools.pack_int16(self._get_nonce(module))
+        nonce = tools.pack_int16(module.nonce)
         io_id = tools.pack_int16(io_id)
         conn_id_packed = tools.pack_int16(conn_id)
         ad = conn_id_packed + io_id + nonce
+
+        module.nonce += 1
 
         cipher = await encryption.SPONGENT.encrypt(module_key, ad, key)
 

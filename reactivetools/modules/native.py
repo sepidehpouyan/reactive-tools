@@ -8,6 +8,10 @@ from ..nodes import NativeNode
 from .. import tools
 from .. import glob
 from ..crypto import Encryption
+from ..dumpers import *
+from ..loaders import *
+
+BUILD_APP = "cargo build {} {} --manifest-path={}/Cargo.toml"
 
 class Object():
     pass
@@ -17,11 +21,9 @@ class Error(Exception):
 
 
 class NativeModule(Module):
-    def __init__(self, name, node, priority, deployed, features, id=None, binary=None,
-                    key=None, data=None):
-        super().__init__(name, node, priority, deployed)
-
-        self.__check_init_args(node, id, binary, key, data)
+    def __init__(self, name, node, priority, deployed, nonce, features,
+                id, binary, key, data, folder):
+        super().__init__(name, node, priority, deployed, nonce)
 
         self.__deploy_fut = tools.init_future(id) # not completely true
         self.__generate_fut = tools.init_future(data, key)
@@ -30,7 +32,42 @@ class NativeModule(Module):
         self.features = [] if features is None else features
         self.id = id if id is not None else node.get_module_id()
         self.port = self.node.reactive_port + self.id
-        self.output = "build/{}".format(name)
+        self.output = os.path.join(os.getcwd(), "build", name)
+        self.folder = folder
+
+
+    @staticmethod
+    def load(mod_dict, node_obj):
+        name = mod_dict['name']
+        node = node_obj
+        priority = mod_dict.get('priority')
+        deployed = mod_dict.get('deployed')
+        nonce = mod_dict.get('nonce')
+        features = mod_dict.get('features')
+        id = mod_dict.get('id')
+        binary = parse_file_name(mod_dict.get('binary'))
+        key = parse_key(mod_dict.get('key'))
+        data = mod_dict.get('data')
+        folder = mod_dict.get('folder') or name
+
+        return NativeModule(name, node, priority, deployed, nonce, features,
+                id, binary, key, data, folder)
+
+    def dump(self):
+        return {
+            "type": "native",
+            "name": self.name,
+            "node": self.node.name,
+            "priority": self.priority,
+            "deployed": self.deployed,
+            "nonce": self.nonce,
+            "features": self.features,
+            "id": self.id,
+            "binary": dump(self.binary),
+            "key": dump(self.key),
+            "data": dump(self.data),
+            "folder": self.folder
+        }
 
     # --- Properties --- #
 
@@ -93,10 +130,6 @@ class NativeModule(Module):
             self.__deploy_fut = asyncio.ensure_future(self.node.deploy(self))
 
         await self.__deploy_fut
-
-
-    async def call(self, entry, arg=None):
-        return await self.node.call(self, entry, arg)
 
 
     async def get_id(self):
@@ -168,8 +201,8 @@ class NativeModule(Module):
 
 
     @staticmethod
-    def get_supported_node_type():
-        return NativeNode
+    def get_supported_nodes():
+        return [NativeNode]
 
 
     @staticmethod
@@ -180,21 +213,6 @@ class NativeModule(Module):
     # --- Static methods --- #
 
     # --- Others --- #
-
-    def __check_init_args(self, node, id, binary, key, data):
-        if not isinstance(node, self.get_supported_node_type()):
-            clsname = lambda o: type(o).__name__
-            raise Error('A {} cannot run on a {}'
-                    .format(clsname(self), clsname(node)))
-
-        # For now, either all optionals should be given or none. This might be
-        # relaxed later if necessary.
-        optionals = (id, binary, key, data)
-
-        if None in optionals and any(map(lambda x: x is not None, optionals)):
-            raise Error('Either all of the optional node parameters '
-                        'should be given or none')
-
 
     async def generate_code(self):
         if self.__generate_fut is None:
@@ -211,7 +229,7 @@ class NativeModule(Module):
 
         args = Object()
 
-        args.input = self.name
+        args.input = self.folder
         args.output = self.output
         args.moduleid = self.id
         args.emport = self.node.deploy_port
@@ -228,14 +246,14 @@ class NativeModule(Module):
     async def __build(self):
         await self.generate_code()
 
-        features = ""
-        if self.features:
-            features = "--features " + " ".join(self.features)
+        release = "--release" if glob.get_build_mode() == glob.BuildMode.RELEASE else ""
+        features = "--features " + " ".join(self.features) if self.features else ""
 
-        cmd = glob.BUILD_APP.format(features, self.output).split()
+        cmd = BUILD_APP.format(release, features, self.output).split()
         await tools.run_async(*cmd)
 
-        binary = "{}/target/{}/{}".format(self.output, glob.BUILD_MODE, self.name)
+        binary = os.path.join(self.output,
+                        "target", glob.get_build_mode().to_str(), self.folder)
 
         logging.info("Built module {}".format(self.name))
         return binary
