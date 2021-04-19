@@ -13,8 +13,7 @@ from ..dumpers import *
 from ..loaders import *
 
 # Apps
-RA_SP = "ra_sp"
-RA_CLIENT = "ra_client"
+ATTESTER = "sgx-attester"
 
 # SGX build/sign
 SGX_TARGET = "x86_64-fortanix-unknown-sgx"
@@ -35,32 +34,25 @@ async def _generate_sp_keys():
 
     priv = os.path.join(dir, "private_key.pem")
     pub = os.path.join(dir, "public_key.pem")
+    ias_cert = os.path.join(dir, "ias_root_ca.pem")
 
-    cmd = "ssh-keygen"
-    args_private = "-t rsa -f {} -b 2048 -N ''".format(priv).split()
-    args_public = "-f {}.pub -e -m pem".format(priv).split()
+    cmd = "openssl"
+
+    args_private = "genrsa -f4 -out {} 2048".format(priv).split()
+    args_public = "rsa -in {} -outform PEM -pubout -out {}".format(priv, pub).split()
 
     await tools.run_async_shell(cmd, *args_private)
-    await tools.run_async(cmd, *args_public, output_file=pub)
+    await tools.run_async_shell(cmd, *args_public)
 
-    return pub, priv
+    cmd = "curl"
+    url = "https://certificates.trustedservices.intel.com/Intel_SGX_Attestation_RootCA.pem".split()
+    await tools.run_async(cmd, *url, output_file=ias_cert)
 
-
-async def _run_ra_sp():
-    # kill old ra_sp (if running)
-    try:
-        await tools.run_async("pkill", "-f", RA_SP)
-    except:
-        pass
-
-    arg = await SGXModule._get_ra_sp_priv_key()
-
-    return await tools.run_async_background(RA_SP, arg)
+    return pub, priv, ias_cert
 
 
 class SGXModule(Module):
     _sp_keys_fut = asyncio.ensure_future(_generate_sp_keys())
-    _ra_sp_fut = asyncio.ensure_future(_run_ra_sp())
 
     def __init__(self, name, node, priority, deployed, nonce, vendor_key,
                 ra_settings, features, id, binary, key, sgxs, signature, data,
@@ -290,26 +282,28 @@ class SGXModule(Module):
 
     @staticmethod
     async def _get_ra_sp_pub_key():
-        pub, _ = await SGXModule._sp_keys_fut
+        pub, _, _ = await SGXModule._sp_keys_fut
 
         return pub
 
 
     @staticmethod
     async def _get_ra_sp_priv_key():
-        _, priv = await SGXModule._sp_keys_fut
+        _, priv, _ = await SGXModule._sp_keys_fut
 
         return priv
 
 
     @staticmethod
+    async def _get_ias_root_certificate():
+        _, _, cert = await SGXModule._sp_keys_fut
+
+        return cert
+
+
+    @staticmethod
     async def cleanup():
-        try:
-            process = await SGXModule._ra_sp_fut
-            process.kill()
-            await asyncio.sleep(0.1) # to avoid weird error messages
-        except:
-            pass
+        pass
 
 
     # --- Others --- #
@@ -380,11 +374,25 @@ class SGXModule(Module):
 
     async def __remote_attestation(self):
         await self.deploy()
-        await self._ra_sp_fut
 
-        args = [str(self.node.ip_address), str(self.port), self.ra_settings, await self.sig]
-        key = await tools.run_async_output(RA_CLIENT, *args)
+        env = {}
+        env["SP_PRIVKEY"] = await SGXModule._get_ra_sp_priv_key()
+        env["IAS_CERT"] = await SGXModule._get_ias_root_certificate()
+        env["ENCLAVE_SETTINGS"] = self.ra_settings
+        env["ENCLAVE_SIG"] = await self.sig
+        env["ENCLAVE_HOST"] = str(self.node.ip_address)
+        env["ENCLAVE_PORT"] = str(self.port)
+        env["AESM_PORT"] = str(self.node.aesm_port)
 
-        logging.info("Done Remote Attestation of {}".format(self.name))
+        out, _ = await tools.run_async_output(ATTESTER, env=env)
+        key_arr = eval(out) # from string to array
+        key = bytes(key_arr) # from array to bytes
+
+        # fix: give the module the time to change state
+        # If the EM is multithreaded, it may happen that we send a set_key
+        # command before the module is actually listening for new connections
+        # TODO: find a better way to do this
+        await asyncio.sleep(2)
+        logging.info("Done Remote Attestation of {}. Key: {}".format(self.name, key_arr))
 
         return key

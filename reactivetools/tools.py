@@ -51,47 +51,52 @@ def init_future(*results):
     return fut
 
 
-async def run_async(*args, output_file=os.devnull):
+async def run_async(*args, output_file=os.devnull, env=None):
     logging.debug(' '.join(args))
 
     process = await asyncio.create_subprocess_exec(*args,
                                             stdout=open(output_file, 'wb'),
-                                            stderr=get_stderr())
+                                            stderr=get_stderr(),
+                                            env=env)
     result = await process.wait()
 
     if result != 0:
         raise ProcessRunError(args, result)
 
 
-async def run_async_background(*args):
+async def run_async_background(*args, env=None):
     logging.debug(' '.join(args))
     process = await asyncio.create_subprocess_exec(*args,
                                             stdout=open(os.devnull, 'wb'),
-                                            stderr=get_stderr())
+                                            stderr=get_stderr(),
+                                            env=env)
 
     return process
 
 
-async def run_async_output(*args):
+async def run_async_output(*args, env=None):
     cmd = ' '.join(args)
     logging.debug(cmd)
     process = await asyncio.create_subprocess_exec(*args,
                                             stdout=asyncio.subprocess.PIPE,
-                                            stderr=asyncio.subprocess.PIPE)
+                                            stderr=asyncio.subprocess.PIPE,
+                                            env=env)
     out, err = await process.communicate()
+    result = await process.wait()
 
-    if err:
-        raise Error('cmd "{}" error: {}'.format(cmd, err))
+    if result != 0:
+        raise ProcessRunError(args, result)
 
-    return out
+    return out, err
 
 
-async def run_async_shell(*args):
+async def run_async_shell(*args, env=None):
     cmd = ' '.join(args)
     logging.debug(cmd)
     process = await asyncio.create_subprocess_shell(cmd,
                                             stdout=open(os.devnull, 'wb'),
-                                            stderr=get_stderr())
+                                            stderr=get_stderr(),
+                                            env=env)
     result = await process.wait()
 
     if result != 0:

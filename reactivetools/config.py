@@ -70,7 +70,9 @@ class Config:
 
         # this is needed if we don't have any connections, to ensure that
         # the modules are actually deployed
-        await self.deploy_modules_ordered_async()
+        # TODO: check if you want to only deploy or also do remote attestation
+        futures = map(lambda x : x.get_key(), self.modules)
+        await asyncio.gather(*futures)
 
         futures = map(PeriodicEvent.register, self.periodic_events)
         await asyncio.gather(*futures)

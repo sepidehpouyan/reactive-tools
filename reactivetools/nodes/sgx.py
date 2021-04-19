@@ -22,18 +22,7 @@ class SGXBase(Node):
     def __init__(self, name, ip_address, reactive_port, deploy_port, module_id):
         super().__init__(name, ip_address, reactive_port, deploy_port)
 
-        self.__moduleid = module_id if module_id else 1
-
-
-    def dump(self):
-        return {
-            "type": self.type,
-            "name": self.name,
-            "ip_address": str(self.ip_address),
-            "reactive_port": self.reactive_port,
-            "deploy_port": self.deploy_port,
-            "module_id": self.__moduleid
-        }
+        self._moduleid = module_id if module_id else 1
 
 
     @abstractmethod
@@ -76,14 +65,19 @@ class SGXBase(Node):
 
 
     def get_module_id(self):
-        id = self.__moduleid
-        self.__moduleid += 1
+        id = self._moduleid
+        self._moduleid += 1
 
         return id
 
 
 class SGXNode(SGXBase):
     type = "sgx"
+
+    def __init__(self, name, ip_address, reactive_port, deploy_port, module_id, aesm_port):
+        super().__init__(name, ip_address, reactive_port, deploy_port, module_id)
+
+        self.aesm_port = aesm_port or 13741
 
     @staticmethod
     def load(node_dict):
@@ -92,9 +86,22 @@ class SGXNode(SGXBase):
         reactive_port = node_dict['reactive_port']
         deploy_port = node_dict.get('deploy_port', reactive_port)
         module_id = node_dict.get('module_id')
+        aesm_port = node_dict.get('aesm_port')
 
         return SGXNode(name, ip_address, reactive_port, deploy_port,
-                    module_id)
+                    module_id, aesm_port)
+
+
+    def dump(self):
+        return {
+            "type": self.type,
+            "name": self.name,
+            "ip_address": str(self.ip_address),
+            "reactive_port": self.reactive_port,
+            "deploy_port": self.deploy_port,
+            "module_id": self._moduleid,
+            "aesm_port": self.aesm_port
+        }
 
 
     async def deploy(self, module):
@@ -122,4 +129,10 @@ class SGXNode(SGXBase):
             log='Deploying {} on {}'.format(module.name, self.name)
             )
 
+        # fix: give time to load module.
+        # If the EM is multithreaded, it may happen that we send a set_key
+        # command before the module is actually loaded. Here, we wait to ensure
+        # that the module is running before doing anything else
+        # TODO: find a better way to do this
+        await asyncio.sleep(2)
         module.deployed = True

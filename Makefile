@@ -1,12 +1,7 @@
-REPO						= gianlu33/reactive-tools
-TAG_LATEST			= latest
-TAG_NATIVE			= native
-TAG_SGX					= sgx
-TAG_SANCUS			= sancus
+REPO						?= gianlu33/reactive-tools
+TAG							?= latest
 
 PWD 						= $(shell pwd)
-
-TAG							?= latest
 VOLUME					?= $(PWD)
 
 PYPI_REPO				?= gianlu33/pypi
@@ -18,8 +13,14 @@ create_pkg:
 upload: create_pkg
 	docker run --rm -it -v $(PWD):/usr/src/app $(PYPI_REPO) twine upload --repository pypi dist/* -u $(PYPI_USERNAME)
 
-run:
-	docker run --rm -it --network=host -v $(VOLUME):/usr/src/app/ -v /var/run/aesmd/:/var/run/aesmd $(REPO):$(TAG) bash
-
 clean:
 	sudo rm -rf dist/*
+
+generate_key:
+	openssl genrsa -3 3072 > examples/vendor_key.pem
+
+run:
+	docker run --rm -it --network=host -v $(VOLUME):/usr/src/app/ $(REPO):$(TAG) bash
+
+pull:
+	docker pull $(REPO):$(TAG)

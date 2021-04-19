@@ -252,13 +252,6 @@ def _handle_request(args):
     conf.cleanup()
 
 
-async def close():
-    for task in asyncio.Task.all_tasks():
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-
-
 def main(raw_args=None):
     args = _parse_args(raw_args)
     _setup_logging(args)
@@ -270,10 +263,8 @@ def main(raw_args=None):
             raise
 
         logging.error(e)
-        return 1
-    finally:
-        # If we don't close the event loop explicitly, there is an unhandled
-        # exception being thrown from its destructor. Not sure why but closing
-        # it here prevents annoying noise.
-        asyncio.get_event_loop().run_until_complete(close())
-        asyncio.get_event_loop().close()
+
+        for task in asyncio.Task.all_tasks():
+            task.cancel()
+
+        sys.exit(-1)
