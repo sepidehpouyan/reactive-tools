@@ -54,10 +54,4 @@ class NativeNode(SGXBase):
             log='Deploying {} on {}'.format(module.name, self.name)
             )
 
-        # fix: give time to load module.
-        # If the EM is multithreaded, it may happen that we send a set_key
-        # command before the module is actually loaded. Here, we wait to ensure
-        # that the module is running before doing anything else
-        # TODO: find a better way to do this
-        await asyncio.sleep(2)
         module.deployed = True

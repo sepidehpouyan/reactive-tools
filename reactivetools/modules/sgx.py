@@ -43,6 +43,7 @@ class SGXModule(Module):
         self.__attest_fut = tools.init_future(key)
         self.__sp_keys_fut = asyncio.ensure_future(self.__generate_sp_keys())
 
+        self.key = key
         self.vendor_key = vendor_key
         self.ra_settings = ra_settings
         self.features = [] if features is None else features
@@ -134,10 +135,6 @@ class SGXModule(Module):
         data = await self.data
         return data["requests"]
 
-    @property
-    async def key(self):
-        return await self.attest()
-
 
     @property
     async def binary(self):
@@ -181,7 +178,7 @@ class SGXModule(Module):
         if self.__attest_fut is None:
             self.__attest_fut = asyncio.ensure_future(self.__attest())
 
-        return await self.__attest_fut
+        await self.__attest_fut
 
 
     async def get_id(self):
@@ -249,7 +246,7 @@ class SGXModule(Module):
 
 
     async def get_key(self):
-        return await self.key
+        return self.key
 
 
     @staticmethod
@@ -367,15 +364,9 @@ class SGXModule(Module):
         key_arr = eval(out) # from string to array
         key = bytes(key_arr) # from array to bytes
 
-        # fix: give the module the time to change state
-        # If the EM is multithreaded, it may happen that we send a set_key
-        # command before the module is actually listening for new connections
-        # TODO: find a better way to do this
-        await asyncio.sleep(2)
         logging.info("Done Remote Attestation of {}. Key: {}".format(self.name, key_arr))
+        self.key = key
         self.attested = True
-
-        return key
 
 
     async def __generate_sp_keys(self):
