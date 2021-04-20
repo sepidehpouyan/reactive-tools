@@ -33,7 +33,6 @@ class SGXBase(Node):
     async def set_key(self, module, conn_id, conn_io, encryption, key):
         assert module.node is self
         assert encryption in module.get_supported_encryption()
-        await module.deploy()
 
         io_id = await conn_io.get_index(module)
         nonce = module.nonce
@@ -84,7 +83,7 @@ class SGXNode(SGXBase):
         name = node_dict['name']
         ip_address = ipaddress.ip_address(node_dict['ip_address'])
         reactive_port = node_dict['reactive_port']
-        deploy_port = node_dict.get('deploy_port', reactive_port)
+        deploy_port = node_dict.get('deploy_port') or reactive_port
         module_id = node_dict.get('module_id')
         aesm_port = node_dict.get('aesm_port')
 

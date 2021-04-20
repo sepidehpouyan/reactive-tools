@@ -29,48 +29,26 @@ class Error(Exception):
     pass
 
 
-async def _generate_sp_keys():
-    dir = tools.create_tmp_dir()
-
-    priv = os.path.join(dir, "private_key.pem")
-    pub = os.path.join(dir, "public_key.pem")
-    ias_cert = os.path.join(dir, "ias_root_ca.pem")
-
-    cmd = "openssl"
-
-    args_private = "genrsa -f4 -out {} 2048".format(priv).split()
-    args_public = "rsa -in {} -outform PEM -pubout -out {}".format(priv, pub).split()
-
-    await tools.run_async_shell(cmd, *args_private)
-    await tools.run_async_shell(cmd, *args_public)
-
-    cmd = "curl"
-    url = "https://certificates.trustedservices.intel.com/Intel_SGX_Attestation_RootCA.pem".split()
-    await tools.run_async(cmd, *url, output_file=ias_cert)
-
-    return pub, priv, ias_cert
-
-
 class SGXModule(Module):
-    _sp_keys_fut = asyncio.ensure_future(_generate_sp_keys())
+    sp_lock = asyncio.Lock()
 
-    def __init__(self, name, node, priority, deployed, nonce, vendor_key,
+    def __init__(self, name, node, priority, deployed, nonce, attested, vendor_key,
                 ra_settings, features, id, binary, key, sgxs, signature, data,
-                folder):
-        super().__init__(name, node, priority, deployed, nonce)
+                folder, port):
+        super().__init__(name, node, priority, deployed, nonce, attested)
 
-        self.__deploy_fut = tools.init_future(id) # not completely true
         self.__generate_fut = tools.init_future(data)
         self.__build_fut = tools.init_future(binary)
         self.__convert_sign_fut = tools.init_future(sgxs, signature)
-        self.__ra_fut = tools.init_future(key)
+        self.__attest_fut = tools.init_future(key)
+        self.__sp_keys_fut = asyncio.ensure_future(self.__generate_sp_keys())
 
         self.vendor_key = vendor_key
         self.ra_settings = ra_settings
         self.features = [] if features is None else features
         self.id = id if id is not None else node.get_module_id()
-        self.port = self.node.reactive_port + self.id
-        self.output = os.path.join(os.getcwd(), "build", name)
+        self.port = port or self.node.reactive_port + self.id
+        self.output = os.path.join(glob.BUILD_DIR, name)
         self.folder = folder
 
 
@@ -81,6 +59,7 @@ class SGXModule(Module):
         priority = mod_dict.get('priority')
         deployed = mod_dict.get('deployed')
         nonce = mod_dict.get('nonce')
+        attested = mod_dict.get('attested')
         vendor_key = parse_file_name(mod_dict['vendor_key'])
         settings = parse_file_name(mod_dict['ra_settings'])
         features = mod_dict.get('features')
@@ -91,9 +70,11 @@ class SGXModule(Module):
         signature = parse_file_name(mod_dict.get('signature'))
         data = mod_dict.get('data')
         folder = mod_dict.get('folder') or name
+        port = mod_dict.get('port')
 
-        return SGXModule(name, node, priority, deployed, nonce, vendor_key,
-                settings, features, id, binary, key, sgxs, signature, data, folder)
+        return SGXModule(name, node, priority, deployed, nonce, attested, vendor_key,
+                settings, features, id, binary, key, sgxs, signature, data, folder,
+                port)
 
     def dump(self):
         return {
@@ -103,16 +84,18 @@ class SGXModule(Module):
             "priority": self.priority,
             "deployed": self.deployed,
             "nonce": self.nonce,
+            "attested": self.attested,
             "vendor_key": self.vendor_key,
             "ra_settings": self.ra_settings,
             "features": self.features,
             "id": self.id,
-            "binary": dump(self.binary),
-            "sgxs": dump(self.sgxs),
-            "signature": dump(self.sig),
-            "key": dump(self.key),
-            "data": dump(self.data),
-            "folder": self.folder
+            "binary": dump(self.binary) if self.deployed else None,
+            "sgxs": dump(self.sgxs) if self.deployed else None,
+            "signature": dump(self.sig) if self.deployed else None,
+            "key": dump(self.key) if self.attested else None,
+            "data": dump(self.data) if self.deployed else None,
+            "folder": self.folder,
+            "port": self.port
         }
 
     # --- Properties --- #
@@ -153,10 +136,7 @@ class SGXModule(Module):
 
     @property
     async def key(self):
-        if self.__ra_fut is None:
-            self.__ra_fut = asyncio.ensure_future(self.__remote_attestation())
-
-        return await self.__ra_fut
+        return await self.attest()
 
 
     @property
@@ -194,10 +174,14 @@ class SGXModule(Module):
 
 
     async def deploy(self):
-        if self.__deploy_fut is None:
-            self.__deploy_fut = asyncio.ensure_future(self.node.deploy(self))
+        await self.node.deploy(self)
 
-        await self.__deploy_fut
+
+    async def attest(self):
+        if self.__attest_fut is None:
+            self.__attest_fut = asyncio.ensure_future(self.__attest())
+
+        return await self.__attest_fut
 
 
     async def get_id(self):
@@ -281,32 +265,29 @@ class SGXModule(Module):
     # --- Static methods --- #
 
     @staticmethod
-    async def _get_ra_sp_pub_key():
-        pub, _, _ = await SGXModule._sp_keys_fut
-
-        return pub
-
-
-    @staticmethod
-    async def _get_ra_sp_priv_key():
-        _, priv, _ = await SGXModule._sp_keys_fut
-
-        return priv
-
-
-    @staticmethod
-    async def _get_ias_root_certificate():
-        _, _, cert = await SGXModule._sp_keys_fut
-
-        return cert
-
-
-    @staticmethod
     async def cleanup():
         pass
 
 
     # --- Others --- #
+
+    async def get_ra_sp_pub_key(self):
+        pub, _, _ = await self.__sp_keys_fut
+
+        return pub
+
+
+    async def get_ra_sp_priv_key(self):
+        _, priv, _ = await self.__sp_keys_fut
+
+        return priv
+
+
+    async def get_ias_root_certificate(self):
+        _, _, cert = await self.__sp_keys_fut
+
+        return cert
+
 
     async def generate_code(self):
         if self.__generate_fut is None:
@@ -328,7 +309,7 @@ class SGXModule(Module):
         args.moduleid = self.id
         args.emport = self.node.deploy_port
         args.runner = rustsgxgen.Runner.SGX
-        args.spkey = await self._get_ra_sp_pub_key()
+        args.spkey = await self.get_ra_sp_pub_key()
         args.print = None
 
         data, _ = rustsgxgen.generate(args)
@@ -372,12 +353,10 @@ class SGXModule(Module):
         return sgxs, sig
 
 
-    async def __remote_attestation(self):
-        await self.deploy()
-
+    async def __attest(self):
         env = {}
-        env["SP_PRIVKEY"] = await SGXModule._get_ra_sp_priv_key()
-        env["IAS_CERT"] = await SGXModule._get_ias_root_certificate()
+        env["SP_PRIVKEY"] = await self.get_ra_sp_priv_key()
+        env["IAS_CERT"] = await self.get_ias_root_certificate()
         env["ENCLAVE_SETTINGS"] = self.ra_settings
         env["ENCLAVE_SIG"] = await self.sig
         env["ENCLAVE_HOST"] = str(self.node.ip_address)
@@ -394,5 +373,31 @@ class SGXModule(Module):
         # TODO: find a better way to do this
         await asyncio.sleep(2)
         logging.info("Done Remote Attestation of {}. Key: {}".format(self.name, key_arr))
+        self.attested = True
 
         return key
+
+
+    async def __generate_sp_keys(self):
+        async with self.sp_lock:
+            priv = os.path.join(glob.BUILD_DIR, "private_key.pem")
+            pub = os.path.join(glob.BUILD_DIR, "public_key.pem")
+            ias_cert = os.path.join(glob.BUILD_DIR, "ias_root_ca.pem")
+
+            # check if already generated in a previous run
+            if all(map(lambda x : os.path.exists(x), [priv, pub, ias_cert])):
+                return pub, priv, ias_cert
+
+            cmd = "openssl"
+
+            args_private = "genrsa -f4 -out {} 2048".format(priv).split()
+            args_public = "rsa -in {} -outform PEM -pubout -out {}".format(priv, pub).split()
+
+            await tools.run_async_shell(cmd, *args_private)
+            await tools.run_async_shell(cmd, *args_public)
+
+            cmd = "curl"
+            url = "https://certificates.trustedservices.intel.com/Intel_SGX_Attestation_RootCA.pem".split()
+            await tools.run_async(cmd, *url, output_file=ias_cert)
+
+            return pub, priv, ias_cert

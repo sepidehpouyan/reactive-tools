@@ -70,6 +70,10 @@ def _parse_args(args):
         '--output',
         help='Output file type, between JSON and YAML',
         default=None)
+    deploy_parser.add_argument(
+        '--module',
+        help='Module to deploy (if not specified, deploy all modules not yet deployed)',
+        default=None)
 
     # build
     build_parser = subparsers.add_parser(
@@ -88,6 +92,70 @@ def _parse_args(args):
         '--workspace',
         help='Root directory containing all the modules and the configuration file',
         default=".")
+    build_parser.add_argument(
+        '--module',
+        help='Module to build (if not specified, build all modules)',
+        default=None)
+
+    # attest
+    attest_parser = subparsers.add_parser(
+        'attest',
+        help='Attest deployed modules')
+    attest_parser.set_defaults(command_handler=_handle_attest)
+    attest_parser.add_argument(
+        'config',
+        help='Specify configuration file to use')
+    attest_parser.add_argument(
+        '--result',
+        help='File to write the resulting configuration to')
+    attest_parser.add_argument(
+        '--output',
+        help='Output file type, between JSON and YAML',
+        default=None)
+    attest_parser.add_argument(
+        '--module',
+        help='Module to attest (if not specified, attest all modules not yet attested)',
+        default=None)
+
+    # connect
+    connect_parser = subparsers.add_parser(
+        'connect',
+        help='Connect deployed and attested modules')
+    connect_parser.set_defaults(command_handler=_handle_connect)
+    connect_parser.add_argument(
+        'config',
+        help='Specify configuration file to use')
+    connect_parser.add_argument(
+        '--result',
+        help='File to write the resulting configuration to')
+    connect_parser.add_argument(
+        '--output',
+        help='Output file type, between JSON and YAML',
+        default=None)
+    connect_parser.add_argument(
+        '--connection',
+        help='Connection to establish (if not specified, establish all connections not yet established)',
+        default=None)
+
+    # register
+    register_parser = subparsers.add_parser(
+        'register',
+        help='Register a periodic event')
+    register_parser.set_defaults(command_handler=_handle_register)
+    register_parser.add_argument(
+        'config',
+        help='Specify configuration file to use')
+    register_parser.add_argument(
+        '--result',
+        help='File to write the resulting configuration to')
+    register_parser.add_argument(
+        '--output',
+        help='Output file type, between JSON and YAML',
+        default=None)
+    register_parser.add_argument(
+        '--event',
+        help='Event to register (if not specified, register all events not yet registered)',
+        default=None)
 
     # call
     call_parser = subparsers.add_parser(
@@ -95,10 +163,8 @@ def _parse_args(args):
         help='Call a deployed module')
     call_parser.set_defaults(command_handler=_handle_call)
     call_parser.add_argument(
-        '--config',
-        help='Specify configuration file to use '
-             '(the result of a previous "deploy" run)',
-        required=True)
+        'config',
+        help='Specify configuration file to use')
     call_parser.add_argument(
         '--module',
         help='Name of the module to call',
@@ -119,10 +185,8 @@ def _parse_args(args):
         help='Trigger the output of a \"direct\" connection (between deployer and SM)')
     output_parser.set_defaults(command_handler=_handle_output)
     output_parser.add_argument(
-        '--config',
-        help='Specify configuration file to use '
-             '(the result of a previous "deploy" run)',
-        required=True)
+        'config',
+        help='Specify configuration file to use')
     output_parser.add_argument(
         '--connection',
         help='Connection ID or name of the connection',
@@ -132,6 +196,9 @@ def _parse_args(args):
         help='Argument to pass to the output (hex byte array)',
         type=binascii.unhexlify,
         default=None)
+    output_parser.add_argument(
+        '--result',
+        help='File to write the resulting configuration to')
 
     # request
     request_parser = subparsers.add_parser(
@@ -139,10 +206,8 @@ def _parse_args(args):
         help='Trigger the request of a \"direct\" connection (between deployer and SM)')
     request_parser.set_defaults(command_handler=_handle_request)
     request_parser.add_argument(
-        '--config',
-        help='Specify configuration file to use '
-             '(the result of a previous "deploy" run)',
-        required=True)
+        'config',
+        help='Specify configuration file to use')
     request_parser.add_argument(
         '--connection',
         help='Connection ID or name of the connection',
@@ -152,6 +217,9 @@ def _parse_args(args):
         help='Argument to pass to the request (hex byte array)',
         type=binascii.unhexlify,
         default=None)
+    request_parser.add_argument(
+        '--result',
+        help='File to write the resulting configuration to')
 
     return parser.parse_args(args)
 
@@ -164,15 +232,11 @@ def _handle_deploy(args):
     os.chdir(args.workspace)
     conf = config.load(args.config, args.output)
 
-    if args.deploy_in_order:
-        conf.deploy_modules_ordered()
+    conf.deploy(args.deploy_in_order, args.module)
 
-    conf.install()
-
-    if args.result is not None:
-        logging.info('Writing post-deployment configuration to %s', args.result)
-        config.dump_config(conf, args.result)
-
+    out_file = args.result or args.config
+    logging.info('Writing post-deployment configuration to %s', out_file)
+    config.dump_config(conf, out_file)
     conf.cleanup()
 
 
@@ -184,7 +248,46 @@ def _handle_build(args):
     os.chdir(args.workspace)
     conf = config.load(args.config)
 
-    conf.build()
+    conf.build(args.module)
+    conf.cleanup()
+
+
+def _handle_attest(args):
+    logging.info('Attesting modules')
+
+    conf = config.load(args.config, args.output)
+
+    conf.attest(args.module)
+
+    out_file = args.result or args.config
+    logging.info('Writing post-deployment configuration to %s', out_file)
+    config.dump_config(conf, out_file)
+    conf.cleanup()
+
+
+def _handle_connect(args):
+    logging.info('Connecting modules')
+
+    conf = config.load(args.config, args.output)
+
+    conf.connect(args.connection)
+
+    out_file = args.result or args.config
+    logging.info('Writing post-deployment configuration to %s', out_file)
+    config.dump_config(conf, out_file)
+    conf.cleanup()
+
+
+def _handle_register(args):
+    logging.info('Registering periodic events')
+
+    conf = config.load(args.config, args.output)
+
+    conf.register_event(args.event)
+
+    out_file = args.result or args.config
+    logging.info('Writing post-deployment configuration to %s', out_file)
+    config.dump_config(conf, out_file)
     conf.cleanup()
 
 
@@ -221,8 +324,8 @@ def _handle_output(args):
                                     conn.to_module.node.output(conn, args.arg))
 
     conn.nonce += 1
-    config.dump_config(conf, args.config)
-
+    out_file = args.result or args.config
+    config.dump_config(conf, out_file)
     conf.cleanup()
 
 
@@ -247,14 +350,23 @@ def _handle_request(args):
                                     conn.to_module.node.request(conn, args.arg))
 
     conn.nonce += 2
-    config.dump_config(conf, args.config)
-
+    out_file = args.result or args.config
+    config.dump_config(conf, out_file)
     conf.cleanup()
 
 
 def main(raw_args=None):
     args = _parse_args(raw_args)
     _setup_logging(args)
+
+    # create working directory
+    try:
+        os.mkdir(glob.BUILD_DIR)
+    except FileExistsError:
+        pass
+    except:
+        logging.error("Failed to create build dir")
+        sys.exit(-1)
 
     try:
         args.command_handler(args)

@@ -33,7 +33,8 @@ deployed must be a bool:
     not is_present(dict, "deployed") or
     (is_present(dict, "deployed") and isinstance(dict["deployed"], bool))
 
+attested must be a bool:
+    not is_present(dict, "attested") or
+    (is_present(dict, "attested") and isinstance(dict["attested"], bool))
+
 ## Other constraints ##
-nonce required ONLY after deployment:
-  (not has_value(dict, "deployed", True) and not is_present(dict, "nonce")) or
-  (has_value(dict, "deployed", True) and is_present(dict, "nonce"))

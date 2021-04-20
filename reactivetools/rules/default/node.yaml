@@ -26,3 +26,7 @@ ip_address must be a str:
 
 reactive_port must be a positive u16:
   is_positive_number(dict["reactive_port"])
+
+deploy_port must be a positive u16:
+    not is_present(dict, "deploy_port") or
+    (is_present(dict, "deploy_port") and is_positive_number(dict["deploy_port"]))

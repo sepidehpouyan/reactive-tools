@@ -1,4 +1,7 @@
 from enum import IntEnum
+import os
+
+BUILD_DIR = os.path.join(os.getcwd(), "build")
 
 class Error(Exception):
     pass

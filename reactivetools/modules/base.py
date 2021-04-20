@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
+import os
+import logging
+from .. import glob
 
 class Error(Exception):
     pass
 
 class Module(ABC):
-    def __init__(self, name, node, priority, deployed, nonce):
+    def __init__(self, name, node, priority, deployed, nonce, attested):
         """
         Generic attributes common to all Module subclasses
 
@@ -22,8 +25,19 @@ class Module(ABC):
         self.priority = priority
         self.deployed = deployed
         self.nonce = 0 if nonce is None else nonce
+        self.attested = attested
 
         self.connections = 0
+
+        # create temp dir
+        try:
+            os.mkdir(os.path.join(glob.BUILD_DIR, name))
+        except FileExistsError:
+            pass
+        except:
+            logging.error("Failed to create build dir for {}".format(name))
+            sys.exit(-1)
+            
 
     """
     ### Description ###
@@ -92,6 +106,20 @@ class Module(ABC):
     """
     @abstractmethod
     async def deploy(self):
+        pass
+
+
+    """
+    ### Description ###
+    Coroutine. Attest a deployed module
+
+    ### Parameters ###
+    self: Module object
+
+    ### Returns ###
+    """
+    @abstractmethod
+    async def attest(self):
         pass
 
 

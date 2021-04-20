@@ -17,7 +17,7 @@ class NativeNode(SGXBase):
         name = node_dict['name']
         ip_address = ipaddress.ip_address(node_dict['ip_address'])
         reactive_port = node_dict['reactive_port']
-        deploy_port = node_dict.get('deploy_port', reactive_port)
+        deploy_port = node_dict.get('deploy_port') or reactive_port
         module_id = node_dict.get('module_id')
 
         return NativeNode(name, ip_address, reactive_port, deploy_port,

@@ -81,16 +81,14 @@ class Connection:
         to_input = conn_dict.get('to_input')
         to_handler = conn_dict.get('to_handler')
         encryption = Encryption.from_str(conn_dict['encryption'])
-        key = parse_key(conn_dict.get('key'))
-        nonce = conn_dict.get('nonce')
+        key = parse_key(conn_dict.get('key')) or Connection.generate_key(from_module, to_module, encryption) # auto-generated key
+        nonce = conn_dict.get('nonce') or 0
         id = conn_dict.get('id')
         established = conn_dict.get('established')
 
-        if not established:
+        if id is None:
             id = config.connections_current_id # incremental ID
             config.connections_current_id += 1
-            key = Connection.generate_key(from_module, to_module, encryption) # auto-generated key
-            nonce = 0 # only used for direct connections
 
         name = conn_dict.get('name') or "conn{}".format(id)
 

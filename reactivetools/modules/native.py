@@ -21,18 +21,17 @@ class Error(Exception):
 
 
 class NativeModule(Module):
-    def __init__(self, name, node, priority, deployed, nonce, features,
-                id, binary, key, data, folder):
-        super().__init__(name, node, priority, deployed, nonce)
+    def __init__(self, name, node, priority, deployed, nonce, attested, features,
+                id, binary, key, data, folder, port):
+        super().__init__(name, node, priority, deployed, nonce, attested)
 
-        self.__deploy_fut = tools.init_future(id) # not completely true
         self.__generate_fut = tools.init_future(data, key)
         self.__build_fut = tools.init_future(binary)
 
         self.features = [] if features is None else features
         self.id = id if id is not None else node.get_module_id()
-        self.port = self.node.reactive_port + self.id
-        self.output = os.path.join(os.getcwd(), "build", name)
+        self.port = port or self.node.reactive_port + self.id
+        self.output = os.path.join(glob.BUILD_DIR, name)
         self.folder = folder
 
 
@@ -43,15 +42,17 @@ class NativeModule(Module):
         priority = mod_dict.get('priority')
         deployed = mod_dict.get('deployed')
         nonce = mod_dict.get('nonce')
+        attested = mod_dict.get('attested')
         features = mod_dict.get('features')
         id = mod_dict.get('id')
         binary = parse_file_name(mod_dict.get('binary'))
         key = parse_key(mod_dict.get('key'))
         data = mod_dict.get('data')
         folder = mod_dict.get('folder') or name
+        port = mod_dict.get('port')
 
-        return NativeModule(name, node, priority, deployed, nonce, features,
-                id, binary, key, data, folder)
+        return NativeModule(name, node, priority, deployed, nonce, attested,
+                features, id, binary, key, data, folder, port)
 
     def dump(self):
         return {
@@ -61,12 +62,14 @@ class NativeModule(Module):
             "priority": self.priority,
             "deployed": self.deployed,
             "nonce": self.nonce,
+            "attested": self.attested,
             "features": self.features,
             "id": self.id,
-            "binary": dump(self.binary),
-            "key": dump(self.key),
-            "data": dump(self.data),
-            "folder": self.folder
+            "binary": dump(self.binary) if self.deployed else None,
+            "key": dump(self.key) if self.deployed else None, # For native, key is generated at compile time
+            "data": dump(self.data) if self.deployed else None,
+            "folder": self.folder,
+            "port": self.port
         }
 
     # --- Properties --- #
@@ -126,10 +129,14 @@ class NativeModule(Module):
 
 
     async def deploy(self):
-        if self.__deploy_fut is None:
-            self.__deploy_fut = asyncio.ensure_future(self.node.deploy(self))
+        await self.node.deploy(self)
 
-        await self.__deploy_fut
+
+    async def attest(self):
+        # Native attestation is not really needed.
+        # TODO with attestation-manager, we still need to send a msg to it
+        await self.key
+        self.attested = True
 
 
     async def get_id(self):

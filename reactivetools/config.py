@@ -62,41 +62,122 @@ class Config:
         raise Error('No connection with name {}'.format(name))
 
 
-    async def install_async(self):
+    def get_periodic_event(self, name):
+        for e in self.periodic_events:
+            if e.name == name:
+                return e
+
+        raise Error('No periodic event with name {}'.format(name))
+
+
+    async def deploy_priority_modules(self):
+        priority_modules = [sm for sm in self.modules if sm.priority is not None and not sm.deployed]
+        priority_modules.sort(key=lambda sm : sm.priority)
+
+        logging.debug("Priority modules: {}".format([sm.name for sm in priority_modules]))
+        for module in priority_modules:
+            await module.deploy()
+
+
+    async def deploy_async(self, in_order, module):
+        # If module is not None, deploy just this one
+        if module:
+            mod = self.get_module(module)
+            if mod.deployed:
+                raise Error('Module {} already deployed'.format(module))
+
+            logging.info("Deploying {}".format(module))
+            await mod.deploy()
+            return
+
+        # First, deploy all modules that have a priority (in order of priority)
         await self.deploy_priority_modules()
 
-        futures = map(Connection.establish, self.connections)
-        await asyncio.gather(*futures)
+        # If deployment in order is desired, deploy one module at a time
+        if in_order:
+            for module in self.modules:
+                if not module.deployed:
+                    await module.deploy()
+        # Otherwise, deploy all modules concurrently
+        else:
+            lst = self.modules
+            l_filter = lambda x : not x.deployed
+            l_map = lambda x : x.deploy()
 
-        # this is needed if we don't have any connections, to ensure that
-        # the modules are actually deployed
-        # TODO: check if you want to only deploy or also do remote attestation
-        futures = map(lambda x : x.get_key(), self.modules)
-        await asyncio.gather(*futures)
-
-        futures = map(PeriodicEvent.register, self.periodic_events)
-        await asyncio.gather(*futures)
-
-    def install(self):
-        asyncio.get_event_loop().run_until_complete(self.install_async())
-
-    async def deploy_modules_ordered_async(self):
-        for module in self.modules:
-            await module.deploy()
-            await module.get_key() # trigger remote attestation for some modules (e.g. SGX)
-
-    def deploy_modules_ordered(self):
-        asyncio.get_event_loop().run_until_complete(
-                                self.deploy_modules_ordered_async())
+            futures = map(l_map, filter(l_filter, lst))
+            await asyncio.gather(*futures)
 
 
-    async def build_async(self):
-        futures = [module.build() for module in self.modules]
+    def deploy(self, in_order, module):
+        asyncio.get_event_loop().run_until_complete(self.deploy_async(in_order, module))
+
+
+    async def build_async(self, module):
+        lst = self.modules if not module else [self.get_module(module)]
+
+        futures = [module.build() for module in lst]
         await asyncio.gather(*futures)
 
 
-    def build(self):
-        asyncio.get_event_loop().run_until_complete(self.build_async())
+    def build(self, module):
+        asyncio.get_event_loop().run_until_complete(self.build_async(module))
+
+
+    async def attest_async(self, module):
+        lst = self.modules if not module else [self.get_module(module)]
+
+        to_attest = list(filter(lambda x : not x.attested, lst))
+
+        if any(map(lambda x : not x.deployed, to_attest)):
+            raise Error("One or more modules to attest are not deployed yet")
+
+        logging.info("To attest: {}".format([x.name for x in to_attest]))
+
+        futures = map(lambda x : x.attest(), to_attest)
+        await asyncio.gather(*futures)
+
+
+    def attest(self, module):
+        asyncio.get_event_loop().run_until_complete(self.attest_async(module))
+
+
+    async def connect_async(self, conn):
+        lst = self.connections if not conn else [self.get_connection_by_name(conn)]
+
+        to_connect = list(filter(lambda x : not x.established, lst))
+
+        if any(map(
+            lambda x : (x.from_module and not x.from_module.attested) or
+            not x.to_module.attested,
+        to_connect)):
+            raise Error("One or more modules to connect are not attested yet")
+
+        logging.info("To connect: {}".format([x.name for x in to_connect]))
+
+        futures = map(lambda x : x.establish(), to_connect)
+        await asyncio.gather(*futures)
+
+
+    def connect(self, conn):
+        asyncio.get_event_loop().run_until_complete(self.connect_async(conn))
+
+
+    async def register_async(self, event):
+        lst = self.periodic_events if not event else [self.get_periodic_event(event)]
+
+        to_register = list(filter(lambda x : not x.established, lst))
+
+        if any(map(lambda x : not x.module.attested, to_register)):
+            raise Error("One or more modules are not attested yet")
+
+        logging.info("To register: {}".format([x.name for x in to_register]))
+
+        futures = map(lambda x : x.register(), to_register)
+        await asyncio.gather(*futures)
+
+
+    def register_event(self, event):
+        asyncio.get_event_loop().run_until_complete(self.register_async(event))
 
 
     async def cleanup_async(self):
@@ -106,15 +187,6 @@ class Config:
 
     def cleanup(self):
         asyncio.get_event_loop().run_until_complete(self.cleanup_async())
-
-
-    async def deploy_priority_modules(self):
-        priority_modules = [sm for sm in self.modules if sm.priority is not None]
-        priority_modules.sort(key=lambda sm : sm.priority)
-
-        logging.debug("Priority modules: {}".format([sm.name for sm in priority_modules]))
-        for module in priority_modules:
-            await module.deploy()
 
 
 def load(file_name, output_type=None):
@@ -134,6 +206,7 @@ def load(file_name, output_type=None):
                                 lambda m: _load_module(m, config))
 
     config.connections_current_id = contents.get('connections_current_id') or 0
+    config.events_current_id = contents.get('events_current_id') or 0
 
     if 'connections' in contents:
         config.connections = load_list(contents['connections'],
@@ -217,6 +290,7 @@ def _(config):
             'modules': dump(config.modules),
             'connections_current_id': config.connections_current_id,
             'connections': dump(config.connections),
+            'events_current_id': config.events_current_id,
             'periodic-events' : dump(config.periodic_events)
         }
 

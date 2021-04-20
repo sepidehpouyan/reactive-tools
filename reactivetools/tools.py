@@ -6,6 +6,8 @@ import base64
 import struct
 from enum import Enum
 
+from . import glob
+
 class ProcessRunError(Exception):
     def __init__(self, args, result):
         self.args = args
@@ -103,14 +105,15 @@ async def run_async_shell(*args, env=None):
         raise ProcessRunError(args, result)
 
 
-def create_tmp(suffix=''):
-    fd, path = tempfile.mkstemp(suffix=suffix)
+def create_tmp(suffix='', dir=''):
+    dir = os.path.join(glob.BUILD_DIR, dir)
+    fd, path = tempfile.mkstemp(suffix=suffix, dir=dir)
     os.close(fd)
     return path
 
 
 def create_tmp_dir():
-    return tempfile.mkdtemp()
+    return tempfile.mkdtemp(dir=glob.BUILD_DIR)
 
 
 def generate_key(length):

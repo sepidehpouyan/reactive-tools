@@ -23,23 +23,23 @@ direct or from_output->to_input or from_request->to_handler:
   (is_present(dict, "from_output") and is_present(dict, "to_input")) or
   (is_present(dict, "from_request") and is_present(dict, "to_handler"))
 
-key present ONLY after deployment:
-  (not has_value(dict, "established", True) and not is_present(dict, "key")) or
+key mandatory after establishment:
+  not has_value(dict, "established", True) or
   (has_value(dict, "established", True) and is_present(dict, "key"))
 
-nonce present ONLY after deployment:
-  (not has_value(dict, "established", True) and not is_present(dict, "nonce")) or
+nonce mandatory after establishment:
+  not has_value(dict, "established", True) or
   (has_value(dict, "established", True) and is_present(dict, "nonce"))
 
-id present ONLY after deployment:
-  (not has_value(dict, "established", True) and not is_present(dict, "id")) or
+id mandatory after establishment:
+  not has_value(dict, "established", True) or
   (has_value(dict, "established", True) and is_present(dict, "id"))
 
-name mandatory after deployment:
+name mandatory after establishment:
   not has_value(dict, "established", True) or
   (has_value(dict, "established", True) and is_present(dict, "name"))
 
-direct mandatory after deployment:
+direct mandatory after establishment:
   not has_value(dict, "established", True) or
   (has_value(dict, "established", True) and is_present(dict, "direct"))
 

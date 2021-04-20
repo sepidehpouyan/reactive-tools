@@ -18,9 +18,9 @@ class Error(Exception):
 
 
 class SancusModule(Module):
-    def __init__(self, name, node, priority, deployed, nonce, files, cflags,
-            ldflags, binary, id, symtab, key):
-        super().__init__(name, node, priority, deployed, nonce)
+    def __init__(self, name, node, priority, deployed, nonce, attested, files,
+            cflags, ldflags, binary, id, symtab, key):
+        super().__init__(name, node, priority, deployed, nonce, attested)
 
         self.files = files
         self.cflags = cflags
@@ -38,6 +38,7 @@ class SancusModule(Module):
         priority = mod_dict.get('priority')
         deployed = mod_dict.get('deployed')
         nonce = mod_dict.get('nonce')
+        attested = mod_dict.get('attested')
         files = load_list(mod_dict['files'],
                            lambda f: parse_file_name(f))
         cflags = load_list(mod_dict.get('cflags'))
@@ -46,9 +47,9 @@ class SancusModule(Module):
         id = mod_dict.get('id')
         symtab = parse_file_name(mod_dict.get('symtab'))
         key = parse_key(mod_dict.get('key'))
-        
-        return SancusModule(name, node, priority, deployed, nonce, files, cflags,
-                ldflags, binary, id, symtab, key)
+
+        return SancusModule(name, node, priority, deployed, nonce, attested,
+                files, cflags, ldflags, binary, id, symtab, key)
 
 
     def dump(self):
@@ -59,13 +60,14 @@ class SancusModule(Module):
             "priority": self.priority,
             "deployed": self.deployed,
             "nonce": self.nonce,
+            "attested": self.attested,
             "files": dump(self.files),
             "cflags": dump(self.cflags),
             "ldflags": dump(self.ldflags),
-            "binary": dump(self.binary),
-            "id": dump(self.id),
-            "symtab": dump(self.symtab),
-            "key": dump(self.key)
+            "binary": dump(self.binary) if self.deployed else None,
+            "id": dump(self.id) if self.deployed else None,
+            "symtab": dump(self.symtab) if self.deployed else None,
+            "key": dump(self.key) if self.deployed else None
         }
 
 
@@ -107,6 +109,10 @@ class SancusModule(Module):
             self.__deploy_fut = asyncio.ensure_future(self.node.deploy(self))
 
         return await self.__deploy_fut
+
+
+    async def attest(self):
+        raise Error("SancusModule::attest not implemented")
 
 
     async def get_id(self):
@@ -176,7 +182,7 @@ class SancusModule(Module):
                      self.name, ', '.join(map(str, self.files)))
 
         config = self._get_build_config(tools.get_verbosity())
-        objects = {str(p): tools.create_tmp(suffix='.o') for p in self.files}
+        objects = {str(p): tools.create_tmp(suffix='.o', dir=self.name) for p in self.files}
 
         cflags = config.cflags + self.cflags
         build_obj = lambda c, o: tools.run_async(config.cc, *cflags,
@@ -184,7 +190,7 @@ class SancusModule(Module):
         build_futs = [build_obj(c, o) for c, o in objects.items()]
         await asyncio.gather(*build_futs)
 
-        binary = tools.create_tmp(suffix='.elf')
+        binary = tools.create_tmp(suffix='.elf', dir=self.name)
         ldflags = config.ldflags + self.ldflags
 
         # setting connections (if not specified in JSON file)
@@ -213,7 +219,7 @@ class SancusModule(Module):
 
 
     async def __link(self):
-        linked_binary = tools.create_tmp(suffix='.elf')
+        linked_binary = tools.create_tmp(suffix='.elf', dir=self.name)
 
         # NOTE: we use '--noinhibit-exec' flag because the linker complains
         #       if the addresses of .bss section are not aligned to 2 bytes
