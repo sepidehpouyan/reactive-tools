@@ -44,6 +44,10 @@ class TrustZoneModule(Module):
         raise Error("TrustZoneModule::deploy not implemented")
 
 
+    async def attest(self):
+        raise Error("TrustZoneModule::attest not implemented")
+
+
     async def get_id(self):
         raise Error("TrustZoneModule::get_id not implemented")
 
