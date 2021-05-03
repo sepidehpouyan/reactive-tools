@@ -29,6 +29,7 @@ class SancusModule(Module):
         self.__build_fut = tools.init_future(binary)
         self.__deploy_fut = tools.init_future(id, symtab)
         self.__key_fut = tools.init_future(key)
+        self.__attest_fut = tools.init_future(attested if attested else None)
 
 
     @staticmethod
@@ -112,7 +113,10 @@ class SancusModule(Module):
 
 
     async def attest(self):
-        raise Error("SancusModule::attest not implemented")
+        if self.__attest_fut is None:
+            self.__attest_fut = asyncio.ensure_future(self.node.attest(self))
+
+        return await self.__attest_fut
 
 
     async def get_id(self):
