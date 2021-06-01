@@ -24,6 +24,6 @@ jobs:
         cache: ${{ github.event_name != 'schedule' }}
         no_push: ${{ github.event_name == 'pull_request' }}
         tag_names: true
-      -
-        name: Image tag and digest
-        run: echo Tag: ${{ steps.docker_build.outputs.tag }} Digest: ${{ steps.docker_build.outputs.digest }}
+    -
+      name: Image tag and digest
+      run: echo Built image with tag ${{ steps.docker_build.outputs.tag }} and digest ${{ steps.docker_build.outputs.digest }}
