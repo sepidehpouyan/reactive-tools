@@ -24,3 +24,12 @@ run:
 
 pull:
 	docker pull $(REPO):$(TAG)
+
+build:
+	docker build -t $(REPO):$(TAG) --build-arg DUMMY=$(shell date +%s) .
+
+push: login
+	docker push $(REPO):$(TAG)
+
+login:
+	docker login
