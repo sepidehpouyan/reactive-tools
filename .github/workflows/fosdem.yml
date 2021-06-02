@@ -26,7 +26,17 @@ jobs:
         docker run --rm --network=host --detach -e EM_PORT=5000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
         docker run --rm --network=host --detach -e EM_PORT=6000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
         git clone https://github.com/gianlu33/authentic-execution.git
-        docker run --rm --network=host -v $(pwd)/authentic-execution:/usr/src/app/ ${{ env.REPO }} reactive-tools --verbose deploy --workspace demo native.json
+        shopt -s expand_aliases
+        alias REACTIVE_TOOLS="docker run --rm --network=host -v $(pwd)/authentic-execution:/usr/src/app/ ${{ env.REPO }} reactive-tools"
+        REACTIVE_TOOLS --verbose deploy --workspace demo native.json --result ../res.json
+        REACTIVE_TOOLS --verbose output --config res.json --connection init-server --arg beef
+        [ $(curl localhost:48879) -eq 0 ]
+        REACTIVE_TOOLS --verbose output --config res.json --connection trigger-btn
+        [ $(curl localhost:48879) -eq 1 ]
+        REACTIVE_TOOLS --verbose output --config res.json --connection trigger-btn
+        [ $(curl localhost:48879) -eq 2 ]
     -
       name: Push
-      run: docker push ${{ env.REPO }}
+      run: |
+        docker push ${{ env.REPO }}
+        docker logout
