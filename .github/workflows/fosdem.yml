@@ -12,19 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     -
+      uses: actions/checkout@master
+    -
       name: Login
       run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
     -
-      name: Pull
-      run: git clone --branch fosdem-21 https://github.com/gianlu33/reactive-tools.git
-    -
       name: Build
-      run: cd reactive-tools && docker build -t ${{ env.REPO }} .
+      run: docker build -f Dockerfile.fosdem -t ${{ env.REPO }} .
     -
       name: Test
       run: |
-        docker run --rm --network=host --detach -e EM_PORT=5000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
-        docker run --rm --network=host --detach -e EM_PORT=6000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
+        docker run --rm --network=host --detach -e EM_PORT=5000 -e EM_SGX=false gianlu33/reactive-event-manager:fosdem
+        docker run --rm --network=host --detach -e EM_PORT=6000 -e EM_SGX=false gianlu33/reactive-event-manager:fosdem
         git clone https://github.com/gianlu33/authentic-execution.git
         shopt -s expand_aliases
         alias REACTIVE_TOOLS="docker run --rm --network=host -v $(pwd)/authentic-execution:/usr/src/app/ ${{ env.REPO }} reactive-tools"

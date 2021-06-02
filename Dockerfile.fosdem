@@ -1,0 +1,31 @@
+FROM gianlu33/reactive-base:latest
+
+WORKDIR /usr/src/install
+
+# Patch sancus-compiler and sancus-support using the fosdem-21 version of the repos
+ARG SANCUS_SECURITY=128
+ARG SANCUS_KEY=deadbeefcafebabec0defeeddefec8ed
+
+RUN git clone --branch fosdem-21 https://github.com/gianlu33/sancus-compiler.git \
+    && mkdir -p sancus-compiler/build && cd sancus-compiler/build \
+    && cmake .. -DSECURITY=$2 -DMASTER_KEY=$3 \
+    && make && make install
+
+RUN git clone --branch fosdem-21 https://github.com/gianlu33/sancus-support.git \
+    && mkdir -p sancus-support/build && cd sancus-support/build \
+    && cmake .. -DSECURITY=$2 -DMASTER_KEY=$3 \
+    && make && make install
+
+
+# Install python packages using the fosdem-21 version of the repos
+# Install reactive-tools first, otherwise the versions of reactive-net and rust-sgx-gen will be replaced
+
+RUN git clone --branch fosdem-21 https://github.com/gianlu33/reactive-net.git \
+    && git clone --branch fosdem-21 https://github.com/gianlu33/rust-sgx-gen.git \
+    && git clone --branch fosdem-21 https://github.com/gianlu33/reactive-tools.git \
+    && pip install reactive-tools/ \
+    && pip install reactive-net/ \
+    && pip install rust-sgx-gen/ \
+    && rm -rf /usr/src/install
+
+  WORKDIR /usr/src/app
