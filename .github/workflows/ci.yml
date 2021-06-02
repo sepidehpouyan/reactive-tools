@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - master
-      - fosdem-21
   schedule:
     - cron: '0 0 1 */1 *' # Every month
   pull_request:
