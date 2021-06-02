@@ -1,0 +1,32 @@
+name: Fosdem
+on:
+  schedule:
+    - cron: '0 0 1 */1 *' # Every month
+  workflow_dispatch: # Allow manual triggering
+
+env:
+  REPO: gianlu33/reactive-tools:fosdem
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      name: Login
+      run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+    -
+      name: Pull
+      run: git clone --branch fosdem-21 https://github.com/gianlu33/reactive-tools.git
+    -
+      name: Build
+      run: cd reactive-tools && docker build -t ${{ env.REPO }} .
+    -
+      name: Test
+      run: |
+        docker run --rm --network=host --detach -e EM_PORT=5000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
+        docker run --rm --network=host --detach -e EM_PORT=6000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
+        git clone https://github.com/gianlu33/authentic-execution.git
+        docker run --rm --network=host -v $(pwd)/authentic-execution:/usr/src/app/ ${{ env.REPO }} reactive-tools --verbose deploy --workspace demo native.json
+    -
+      name: Push
+      run: docker push ${{ env.REPO }}

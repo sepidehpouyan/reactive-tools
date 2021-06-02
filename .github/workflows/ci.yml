@@ -7,23 +7,36 @@ on:
   schedule:
     - cron: '0 0 1 */1 *' # Every month
   pull_request:
+  workflow_dispatch: # Allow manual triggering
+
+env:
+  REPO: gianlu33/reactive-tools
+
 jobs:
-  build:
+  build-test-publish:
     runs-on: ubuntu-latest
     steps:
     -
       uses: actions/checkout@master
     -
-      name: Build and push
-      id: docker_build
-      uses: elgohr/Publish-Docker-Github-Action@master
+      name: Build
+      id: build
+      uses: gianlu33/Publish-Docker-Github-Action@main
       with:
-        name: gianlu33/reactive-tools
+        name: ${{ env.REPO }}
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
         cache: ${{ github.event_name != 'schedule' }}
-        no_push: ${{ github.event_name == 'pull_request' }}
         tag_names: true
+        no_push: true
     -
-      name: Image tag and digest
-      run: echo Built image with tag ${{ steps.docker_build.outputs.tag }} and digest ${{ steps.docker_build.outputs.digest }}
+      name: Test
+      run: |
+        docker run --rm --network=host --detach -e EM_PORT=5000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
+        docker run --rm --network=host --detach -e EM_PORT=6000 -e EM_SGX=false gianlu33/reactive-event-manager:latest
+        git clone https://github.com/gianlu33/authentic-execution.git
+        docker run --rm --network=host -v $(pwd)/authentic-execution:/usr/src/app/ ${{ env.REPO }}:${{ steps.build.outputs.tag }} reactive-tools --verbose deploy --workspace demo native.json
+    -
+      name: Push
+      if: ${{ github.event_name != 'pull_request' }}
+      run: docker push ${{ env.REPO }}:${{ steps.build.outputs.tag }}
