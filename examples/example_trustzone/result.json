@@ -1,0 +1,78 @@
+{
+    "nodes": [
+        {
+            "type": "trustzone",
+            "name": "node1",
+            "number": 1,
+            "ip_address": "127.0.0.1",
+            "reactive_port": 1236,
+            "deploy_port": 1236
+        }
+    ],
+    "modules": [
+        {
+            "type": "trustzone",
+            "name": "ta1",
+            "node": "node1",
+            "priority": null,
+            "deployed": true,
+            "nonce": 1,
+            "attested": true,
+            "files_dir": "/home/sepideh/Desktop/reactive-tools/examples/example_trustzone",
+            "binary": "/home/sepideh/Desktop/reactive-tools/examples/example_trustzone/ta1/d3bc8433-2eb5-4c00-a005-3f87c1d3b405.ta",
+            "id": 281445940253181251961359712745212326917,
+            "key": "a13a85e75decfadcdc4e13f7114bd47a",
+            "inputs": {
+                "input": 1
+            },
+            "outputs": {
+                "output": 0
+            },
+            "entrypoints": {
+                "entry": 3
+            }
+        },
+        {
+            "type": "trustzone",
+            "name": "ta2",
+            "node": "node1",
+            "priority": null,
+            "deployed": true,
+            "nonce": 1,
+            "attested": true,
+            "files_dir": "/home/sepideh/Desktop/reactive-tools/examples/example_trustzone",
+            "binary": "/home/sepideh/Desktop/reactive-tools/examples/example_trustzone/ta2/b210f0df-8a68-4b24-880a-8713586c4d10.ta",
+            "id": 236690545488471714192740514222985465104,
+            "key": "07be766d79cd37512a6e1872c6c1507f",
+            "inputs": {
+                "input": 1
+            },
+            "outputs": {
+                "output": 0
+            },
+            "entrypoints": {
+                "entry": 3
+            }
+        }
+    ],
+    "connections_current_id": 1,
+    "connections": [
+        {
+            "name": "conn0",
+            "from_module": "ta1",
+            "from_output": "output",
+            "from_request": null,
+            "to_module": "ta2",
+            "to_input": "input",
+            "to_handler": null,
+            "encryption": "aes",
+            "key": "1afd100197792d6f8742800acf33c018",
+            "id": 0,
+            "direct": false,
+            "nonce": 0,
+            "established": true
+        }
+    ],
+    "events_current_id": 0,
+    "periodic-events": []
+}

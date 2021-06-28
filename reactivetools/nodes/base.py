@@ -18,7 +18,7 @@ class Node(ABC):
         Generic attributes common to all Node subclasses
 
         ### Attributes ###
-        name (str): name of the module
+        name (str): name of the node
         ip_address (ip_address): IP of the node
         reactive_port (int): port where the event manager listens for events
         deploy_port (int): port where the event manager listens for new modules
@@ -35,7 +35,6 @@ class Node(ABC):
             self.__lock = asyncio.Lock()
         else:
             self.__lock = None
-
 
 
     """
@@ -172,7 +171,6 @@ class Node(ABC):
         await self._send_reactive_command(
                 command,
                 log='Connecting id {} to {}'.format(conn_id, to_module.name))
-
 
 
     """
