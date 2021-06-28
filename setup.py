@@ -17,8 +17,8 @@ setuptools.setup(
         'pyelftools==0.27',
         'aiofile==3.3.3',
         'pycryptodome==3.10.1',
-        'reactive-net==0.1',
-        'rust-sgx-gen==0.1',
+        'reactive-net==0.2',
+        'rust-sgx-gen==0.1.3',
         'PyYAML==5.4.1'
     ],
     classifiers=[
