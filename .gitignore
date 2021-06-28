@@ -7,3 +7,5 @@ dist
 
 vendor_key.pem
 res.json
+
+.vscode
