@@ -1,3 +1,4 @@
+
 import logging
 import asyncio
 import binascii
@@ -31,8 +32,17 @@ class TrustZoneModule(Module):
         self.__attest_fut = tools.init_future(attested if attested else None)
 
 
+class TrustZoneModule(Module):
+    # add init parameters as you need
+    def __init__(self, name, node, priority, deployed, nonce):
+        super().__init__(name, node, priority, deployed, nonce)
+        raise Error("TrustZoneModule::__init__ not implemented")
+
+
+
     @staticmethod
     def load(mod_dict, node_obj):
+
         name = mod_dict['name']
         node = node_obj
         priority = mod_dict.get('priority')
@@ -133,6 +143,42 @@ class TrustZoneModule(Module):
     async def get_key(self):
         return self.key
 
+        raise Error("TrustZoneModule::load not implemented")
+
+
+    def dump(self):
+        raise Error("TrustZoneModule::dump not implemented")
+
+
+    # --- Implement abstract methods --- #
+
+    async def build(self):
+        raise Error("TrustZoneModule::build not implemented")
+
+
+    async def deploy(self):
+        raise Error("TrustZoneModule::deploy not implemented")
+
+
+    async def get_id(self):
+        raise Error("TrustZoneModule::get_id not implemented")
+
+
+    async def get_input_id(self, input):
+        raise Error("TrustZoneModule::get_input_id not implemented")
+
+
+    async def get_output_id(self, output):
+        raise Error("TrustZoneModule::get_output_id not implemented")
+
+
+    async def get_entry_id(self, entry):
+        raise Error("TrustZoneModule::get_entry_id not implemented")
+
+
+    async def get_key(self):
+        raise Error("TrustZoneModule::get_key not implemented")
+
 
     @staticmethod
     def get_supported_nodes():
@@ -142,6 +188,7 @@ class TrustZoneModule(Module):
     @staticmethod
     def get_supported_encryption():
         return [Encryption.AES, Encryption.SPONGENT]
+
 
      # --- Other methods --- #       
 
@@ -164,3 +211,4 @@ class TrustZoneModule(Module):
         binary = self.files_dir + "/" + self.name + "/" + self.uuid_for_MK + ".ta"
 
         return binary
+
