@@ -151,9 +151,9 @@ class TrustZoneModule(Module):
 
         binary = ""
 
-        compiler = "CROSS_COMPILE=/home/sepideh/optee-qemu/toolchains/aarch32/bin/arm-linux-gnueabihf-"
+        compiler = "CROSS_COMPILE=arm-linux-gnueabihf-"
         plat = "PLATFORM=vexpress-qemu_virt"
-        dev_kit = "TA_DEV_KIT_DIR=/home/sepideh/optee-qemu/optee_os/out/arm/export-ta_arm32"
+        dev_kit = "TA_DEV_KIT_DIR=/optee/optee_os/out/arm/export-ta_arm32"
         binary_name = "BINARY=" + self.uuid_for_MK
 
         cmd = "make -C " + self.files_dir + "/" + self.name + " " + compiler + " " + plat + \
