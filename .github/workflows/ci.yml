@@ -4,7 +4,7 @@ on:
     branches:
       - master
   schedule:
-    - cron: '0 0 1 */1 *' # Every month
+    - cron: '0 0 2 */1 *' # Every month
   pull_request:
   workflow_dispatch: # Allow manual triggering
 

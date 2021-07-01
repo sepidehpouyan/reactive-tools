@@ -1,7 +1,7 @@
 name: Fosdem
 on:
   schedule:
-    - cron: '0 0 1 */1 *' # Every month
+    - cron: '0 0 2 */1 *' # Every month
   workflow_dispatch: # Allow manual triggering
 
 env:
