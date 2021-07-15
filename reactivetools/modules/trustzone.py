@@ -5,6 +5,7 @@ import binascii
 from .base import Module
 from ..nodes import TrustZoneNode
 from .. import tools
+from .. import glob
 from ..crypto import Encryption
 from ..dumpers import *
 from ..loaders import *
@@ -12,6 +13,10 @@ from ..loaders import *
 class Error(Exception):
     pass
 
+COMPILER  = "CROSS_COMPILE=arm-linux-gnueabihf-"
+PLATFORM  = "PLATFORM=vexpress-qemu_virt"
+DEV_KIT   = "TA_DEV_KIT_DIR=/optee/optee_os/out/arm/export-ta_arm32"
+BUILD_CMD = "make -C {{}}/{{}} {} {} {} {{}} O={}/{{}}".format(COMPILER, PLATFORM, DEV_KIT, glob.BUILD_DIR)
 
 class TrustZoneModule(Module):
     def __init__(self, name, node, priority, deployed, nonce, attested, files_dir,
@@ -100,6 +105,7 @@ class TrustZoneModule(Module):
     async def get_id(self):
         return self.id
 
+
     async def get_input_id(self, input):
         if isinstance(input, int):
             return input
@@ -110,6 +116,7 @@ class TrustZoneModule(Module):
             raise Error("Input not present in inputs")
 
         return inputs[input]
+
 
     async def get_output_id(self, output):
         if isinstance(output, int):
@@ -122,6 +129,7 @@ class TrustZoneModule(Module):
 
         return outputs[output]
 
+
     async def get_entry_id(self, entry):
         if entry.isnumeric():
             return int(entry)
@@ -132,6 +140,7 @@ class TrustZoneModule(Module):
             raise Error("Entry not present in entrypoints")
 
         return entrypoints[entry]
+
 
     async def get_key(self):
         return self.key
@@ -152,18 +161,11 @@ class TrustZoneModule(Module):
         hex = '%032x' % (self.uuid)
         self.uuid_for_MK = '%s-%s-%s-%s-%s' % (hex[:8], hex[8:12], hex[12:16], hex[16:20], hex[20:])
 
-        binary = ""
-
-        compiler = "CROSS_COMPILE=arm-linux-gnueabihf-"
-        plat = "PLATFORM=vexpress-qemu_virt"
-        dev_kit = "TA_DEV_KIT_DIR=/optee/optee_os/out/arm/export-ta_arm32"
         binary_name = "BINARY=" + self.uuid_for_MK
-
-        cmd = "make -C " + self.files_dir + "/" + self.name + " " + compiler + " " + plat + \
-             " " + dev_kit + " " + binary_name
+        cmd = BUILD_CMD.format(self.files_dir, self.name, binary_name, self.name)
 
         await tools.run_async_shell(cmd)
 
-        binary = self.files_dir + "/" + self.name + "/" + self.uuid_for_MK + ".ta"
+        binary = "{}/{}/{}.ta".format(self.files_dir, self.name, self.uuid_for_MK)
 
         return binary
