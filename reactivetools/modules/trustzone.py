@@ -15,11 +15,12 @@ class Error(Exception):
 
 class TrustZoneModule(Module):
     def __init__(self, name, node, priority, deployed, nonce, attested, files_dir,
-                    binary, id, key, inputs, outputs, entrypoints):
+                    binary, id, uuid, key, inputs, outputs, entrypoints):
         super().__init__(name, node, priority, deployed, nonce, attested)
 
         self.files_dir = files_dir
         self.id = id
+        self.uuid = uuid
         self.key =  key
         self.inputs =  inputs
         self.outputs =  outputs
@@ -42,12 +43,13 @@ class TrustZoneModule(Module):
         files_dir = mod_dict.get('files_dir')
         binary = mod_dict.get('binary')
         id = mod_dict.get('id')
+        uuid = mod_dict.get('uuid')
         key = parse_key(mod_dict.get('key'))
         inputs = mod_dict.get('inputs')
         outputs = mod_dict.get('outputs')
         entrypoints = mod_dict.get('entrypoints')
         return TrustZoneModule(name, node, priority, deployed, nonce, attested, files_dir,
-                                binary, id, key, inputs, outputs, entrypoints)
+                                binary, id, uuid, key, inputs, outputs, entrypoints)
 
 
     def dump(self):
@@ -62,6 +64,7 @@ class TrustZoneModule(Module):
             "files_dir": self.files_dir,
             "binary": dump(self.binary) if self.deployed else None,
             "id": self.id,
+            "uuid": self.uuid,
             "key": dump(self.key),
             "inputs":self.inputs,
             "outputs":self.outputs,
@@ -146,7 +149,7 @@ class TrustZoneModule(Module):
      # --- Other methods --- #
 
     async def __build(self):
-        hex = '%032x' % (self.id)
+        hex = '%032x' % (self.uuid)
         self.uuid_for_MK = '%s-%s-%s-%s-%s' % (hex[:8], hex[8:12], hex[12:16], hex[16:20], hex[20:])
 
         binary = ""

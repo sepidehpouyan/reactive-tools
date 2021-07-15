@@ -233,7 +233,7 @@ def _handle_deploy(args):
     conf = config.load(args.config, args.output)
     
     conf.deploy(args.deploy_in_order, args.module)
-    print("I'm here")
+    
     out_file = args.result or args.config
     logging.info('Writing post-deployment configuration to %s', out_file)
     config.dump_config(conf, out_file)
