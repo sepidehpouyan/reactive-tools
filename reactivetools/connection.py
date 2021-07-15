@@ -138,11 +138,10 @@ class Connection:
         # TODO check if the module is the same: if so, abort!
 
         connect = from_node.connect(self.to_module, self.id)
-        
         set_key_from = from_node.set_key(self.from_module, self.id, self.from_index,
                                      self.encryption, self.key)
         set_key_to = to_node.set_key(self.to_module, self.id, self.to_index,
-                                     self.encryption, self.key) 
+                                     self.encryption, self.key)
 
         await asyncio.gather(connect, set_key_from, set_key_to)
 

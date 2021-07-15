@@ -136,6 +136,7 @@ class Config:
         futures = map(lambda x : x.attest(), to_attest)
         await asyncio.gather(*futures)
 
+
     def attest(self, module):
         asyncio.get_event_loop().run_until_complete(self.attest_async(module))
 
@@ -235,7 +236,7 @@ def _load_module(mod_dict, config):
     evaluate_rules(os.path.join("default", "module.yaml"), mod_dict)
     # Specific rules for a specific node type
     evaluate_rules(os.path.join("modules", module_rules[mod_dict['type']]), mod_dict)
-    
+
     node = config.get_node(mod_dict['node'])
     module = module_funcs[mod_dict['type']](mod_dict, node)
 
