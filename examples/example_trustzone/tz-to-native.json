@@ -1,0 +1,46 @@
+{
+    "nodes": [
+        {
+            "type": "trustzone",
+            "name": "node_trustzone",
+            "ip_address": "127.0.0.1",
+            "reactive_port": 1236
+
+        },
+        {
+            "type": "native",
+            "name": "node_native",
+            "ip_address": "127.0.0.1",
+            "reactive_port": 5000
+        }
+    ],
+    "modules": [
+        {
+            "type": "trustzone",
+            "name": "button_driver",
+            "files_dir": "./examples/example_trustzone",
+            "node": "node_trustzone",
+            "id": 1,
+            "uuid": 281445940253181251961359712745212326917,
+            "key": "EB6712E84217016C03093D0D0FCFCBCD",
+            "outputs": {"button_pressed":0},
+            "entrypoints": {"entry":3 }
+        },
+        {
+            "type": "native",
+            "name": "led_driver",
+            "node": "node_native",
+            "features": ["debug_prints"]
+        }
+    ],
+    "connections": [
+        {
+            "from_module": "button_driver",
+            "from_output": "button_pressed",
+            "to_module": "led_driver",
+            "to_input": "toggle_led",
+            "encryption": "spongent"
+        }   
+    ]
+
+}
