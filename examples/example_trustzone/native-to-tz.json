@@ -18,18 +18,18 @@
         {
             "type": "trustzone",
             "name": "led_driver",
-            "files_dir": "./examples/example_trustzone",
+            "files_dir": ".",
             "node": "node_trustzone",
             "id": 2,
             "uuid": 236690545488471714192740514222985465104,
             "key": "64F8D1B1BC54412690063FAC74BA1619",
-            "inputs": {"toggle_led":1}    
+            "inputs": {"toggle_led":1}
         },
         {
             "type": "native",
             "name": "button_driver",
             "node": "node_native",
-            "features": ["debug_prints"]
+            "folder": "button_driver_native"
         }
     ],
     "connections": [
@@ -39,7 +39,7 @@
             "to_module": "led_driver",
             "to_input": "toggle_led",
             "encryption": "spongent"
-        }   
+        }
     ]
 
 }
