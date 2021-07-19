@@ -166,6 +166,6 @@ class TrustZoneModule(Module):
 
         await tools.run_async_shell(cmd)
 
-        binary = "{}/{}/{}.ta".format(self.files_dir, self.name, self.uuid_for_MK)
+        binary = "{}/{}/{}.ta".format(glob.BUILD_DIR, self.name, self.uuid_for_MK)
 
         return binary
